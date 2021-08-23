@@ -307,3 +307,16 @@ genPeerConfig() {
 
   echo "AllowedIPs = ${allowed_ips}"
 }
+
+iptables_remove_duplicates() {
+  command -p service "$(command -vp iptables)" save
+  command -p iptables-save | command -p awk '/^COMMIT$/ { delete x; }; !x[$0]++' | tee /tmp/iptables.conf &> /dev/null
+  command -p iptables -F
+  command -p iptables-restore < /tmp/iptables.conf
+  command -p service "$(command -vp iptables)" save
+  command -p service "$(command -vp iptables)" restart
+
+  if [[ -f /tmp/iptables.conf ]]; then
+    command -p rm -f /tmp/iptables.conf
+  fi
+}
