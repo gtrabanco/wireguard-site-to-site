@@ -51,12 +51,10 @@ iptables_remove_duplicates
 if [[ ! -r "$VPN_SERVER_PRIVATE_KEY" || ! -r "$VPN_SERVER_PUBLIC_KEY" ]]; then
   rm -f "$VPN_SERVER_PRIVATE_KEY" "$VPN_SERVER_PUBLIC_KEY"
   # Generate keys
-  umask 077
-  wg genkey | tee "$VPN_SERVER_PRIVATE_KEY" | wg pubkey > "$VPN_SERVER_PUBLIC_KEY"
-  umask 022
+  gen_pair_of_keys "$VPN_SERVER_PRIVATE_KEY" "$VPN_SERVER_PUBLIC_KEY"
 fi
 
 PEER_ROUTES="$(get_all_Allowed_IPs)"
-PRIVATE_KEY="$(cat "$VPN_SERVER_PRIVATE_KEY")"
-PUBLIC_KEY="$(cat "$VPN_SERVER_PUBLIC_KEY")"
+# SERVER_PRIVATE_KEY="$(cat "$VPN_SERVER_PRIVATE_KEY")"
+SERVER_PUBLIC_KEY="$(cat "$VPN_SERVER_PUBLIC_KEY")"
 

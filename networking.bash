@@ -246,8 +246,28 @@ get_all_Allowed_IPs() {
   fi
 }
 
+gen_pair_of_keys() {
+  local -r private_key_file_path="${1:-}"
+  local public_key_file_path="${2:-${private_key_file_path}.pub}"
+
+  if
+    [[
+      -z "$private_key_file_path" ||
+      -r "$private_key_file_path" ||
+      -r "$public_key_file_path"
+    ]]
+  then
+    echo "Empty private/public key file path or private or public key file already exists" 1>&2
+    return 1
+  fi
+
+  umask 077
+  wg genkey | tee "$private_key_file_path" | wg pubkey | tee "$public_key_file_path" &> /dev/null
+  umask 022
+}
+
 #"
-# getnInterfaceConfig()
+# genInterfaceConfig()
 # Generate a config for wg Interface
 # @param string ip_address
 # @param string netmask (bits) This param can be ignored if it is included with the ip address
