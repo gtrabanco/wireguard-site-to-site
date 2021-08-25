@@ -1,6 +1,29 @@
 #!/usr/bin/env bash
 #shellcheck disable=SC2206,SC2207,SC2016
 
+start_sudo() {
+  if ! has_sudo; then
+    command -p sudo -v -B
+    if has_sudo && [[ -z "${SUDO_PID:-}" ]]; then
+      (while true; do
+        command -p sudo -v
+        command -p sleep 30
+      done) &
+      SUDO_PID="$!"
+      builtin trap stop_sudo SIGINT SIGTERM
+    fi
+  fi
+}
+
+stop_sudo() {
+  builtin kill "$SUDO_PID" &> /dev/null
+  builtin trap - SIGINT SIGTERM
+  command -p sudo -k
+}
+
+has_sudo() {
+  command -p sudo -n -v &> /dev/null
+}
 
 ipv4_netmask() {
   local IFS='.' netmask=() rest_bits tmp_netmask=0
@@ -267,16 +290,19 @@ gen_pair_of_keys() {
 }
 
 #"
-# genInterfaceConfig()
+# gen_interface_config()
 # Generate a config for wg Interface
+# @param string name
 # @param string ip_address
 # @param string netmask (bits) This param can be ignored if it is included with the ip address
 # @param string server_port
-# @param string private_key If none it will be generated
-# @param string dns_servers If none, it will use 1.1.1.1
+# @param string key If none it will be generated
+# @param string dns_servers If none won't add it
+# @param boolean post_exec
 #;
-genInterfaceConfig() {
-  local -r ip_address="${1:-}"
+gen_interface_config() {
+  local -r name="${1:-}"
+  local -r ip_address="${2:-}"
 
   [[ -z "$ip_address" ]] && echo "Needs an IP address" 1>&2 && return
   ! type wg &> /dev/null && echo "Is wireguard installed?" 1>&2 && return
@@ -284,7 +310,8 @@ genInterfaceConfig() {
   if [[ -n "$(ipGetMask "$ip_address")" ]]; then
     local -r bits="$(ipv4_bits "$(ipGetMask "$ip_address")" || echo -n)"
   else
-    local -r bits="$(ipv4_bits "${2:-0}" || echo -n)"
+    local -r bits="$(ipv4_bits "${3:-0}" || echo -n)"
+    shift
   fi
   # Validate bits
   [[ $bits -lt 0 || $bits -gt 32 ]] && echo "Wrong netmask bits" 1>&2 && return
@@ -292,30 +319,51 @@ genInterfaceConfig() {
   local -r server_port="${3:-51820}"
   # Validate server_port
 
-  local -r private_key="${4:-$(wg genkey)}"
+  local -r key="${4:-}"
+  local -r dns_servers="${5:-}"
+  local -r post_exec=${6:-false}
 
   echo '[Interface]'
+  echo "# Name = ${name}"
   echo "Address = ${ip_address}/${bits}"
   echo "ListenPort = ${server_port}"
-  echo "PrivateKey = ${private_key}"
-  echo "DNS = ${5:-1.1.1.1}"
-  echo "PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE"
-  echo 'PostUp = echo "$(date +%s) WireGuard Started" >> /var/log/wireguard.log'
-  echo "PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE"
-  echo 'PostDown = echo "$(date +%s) WireGuard Going Down" >> /var/log/wireguard.log'
+  echo "PrivateKey = ${key}"
   
+  if [[ -n "${dns_servers:-}" ]]; then
+    echo "DNS = $dns_servers"
+  fi
+  
+  if [[ "${post_exec:-true}" == "true" || "${post_exec:-}" == "1" ]]; then
+    echo "PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE"
+    echo 'PostUp = echo "$(date +%s) WireGuard Started" >> /var/log/wireguard.log'
+    echo "PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE"
+    echo 'PostDown = echo "$(date +%s) WireGuard Going Down" >> /var/log/wireguard.log'
+  fi
+  echo
 }
 
-genPeerConfig() {
-  local -r server_address="${1:-}"
-  local -r public_key="${2:-}"
-  local -r allowed_ips="${3:-0.0.0.0/0, ::/0}"
-  local -r is_nat=${4:-false}
-  local -r pre_shared_key="${5:-}"
+#"
+# gen_peer_config()
+# Generate a config for wg Interface
+# @param string name
+# @param string server_address
+# @param string key
+# @param string allowed_ips
+# @param string is_nat
+# @param string pre_shared_key
+#;
+gen_peer_config() {
+  local -r name="${1:-}"
+  local -r server_address="${2:-}"
+  local -r key="${3:-}"
+  local -r allowed_ips="${4:-0.0.0.0/0, ::/0}"
+  local -r is_nat=${5:-false}
+  local -r pre_shared_key="${6:-}"
 
   echo '[Peer]'
+  echo "# Name = ${name}"
   echo "Endpoint = ${server_address}"
-  echo "PublicKey = ${public_key}"
+  echo "PublicKey = ${key}"
   
   if [[ -n "$pre_shared_key" ]]; then
     echo "PresharedKey = ${pre_shared_key}"
@@ -326,6 +374,7 @@ genPeerConfig() {
   fi
 
   echo "AllowedIPs = ${allowed_ips}"
+  echo
 }
 
 iptables_remove_duplicates() {
@@ -339,4 +388,9 @@ iptables_remove_duplicates() {
   if [[ -f /tmp/iptables.conf ]]; then
     command -p rm -f /tmp/iptables.conf
   fi
+}
+
+show_file_as_qr() {
+  [[ ! -r "${1:-}" ]] && return 1
+  qrencode -t UTF8 < "${1:-}"
 }
