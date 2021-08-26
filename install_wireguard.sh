@@ -32,17 +32,17 @@ then
 fi
 
 if ! grep -q '^net.ipv4.ip_forward = 1$' /etc/sysctl.conf; then
-  echo "net.ipv4.ip_forward = 1" | sudo tee -a /etc/sysctl.conf
+  echo "net.ipv4.ip_forward = 1" | sudo tee -a /etc/sysctl.conf | _log "Modify ip forward in sysctl.conf"
   sysctl_modified=true
 fi
 
-if ! grep -q '^net.ipv4.conf.all.proxy_arp = 1$'; then
-  echo "net.ipv4.conf.all.proxy_arp = 1" | sudo tee -a  /etc/sysctl.conf
+if ! grep -q '^net.ipv4.conf.all.proxy_arp = 1$' /etc/sysctl.conf; then
+  echo "net.ipv4.conf.all.proxy_arp = 1" | sudo tee -a  /etc/sysctl.conf | _log "Modify arp proxy in sysctl.conf" &> /dev/null
   sysctl_modified=true
 fi
 
 if ${sysctl_modified:-false}; then
-  sysctl -p /etc/sysctl.conf
+  sudo sysctl -p /etc/sysctl.conf
 fi
 
 if ! ${IGNORE_IPTABLES_CONFIG:-false}; then
