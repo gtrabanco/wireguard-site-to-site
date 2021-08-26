@@ -399,9 +399,35 @@ iptables_remove_duplicates() {
   fi
 }
 
+qrencode_dependency_installed() {
+  if
+    ! command -v qrencode &> /dev/null &&
+    command -v apt &> /dev/null &&
+    ! dpkg --list "wireguard" &> /dev/null
+  then
+    echo "Installing qrencode dependency"
+    command sudo apt-get install -y qrencode &> /dev/null
+    if
+      command -v apt &> /dev/null &&
+      ! dpkg --list "wireguard" &> /dev/null
+    then
+      echo "Failed to install qrencode dependency" 1>&2
+      return 1
+    fi
+  fi
+}
+
 show_file_as_qr() {
   [[ ! -r "${1:-}" ]] && return 1
-  qrencode -t UTF8 < "${1:-}"
+  ! qrencode_dependency_installed && return 1
+  qrencode -m 2 -t ansiutf8 <<< "$1"
+}
+
+generate_qr_code_from_file() {
+  [[ ! -r "${1:-}" || -z "${2:-}" ]] && return 1
+  ! qrencode_dependency_installed && return 1
+
+  qrencode -m 2 -t ansiutf8 -o "${2:-}" <<< "$1"
 }
 
 _log () {

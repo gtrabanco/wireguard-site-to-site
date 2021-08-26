@@ -126,26 +126,31 @@ for i in "${!PEERS_IP[@]}"; do
 
   # Check if peer config already exists
   if
-    [[ -f "$peer_config_file" ]] &&
-    grep -q "^PrivateKey = ${peer_private_key}" &&
+    [[ ! -f "$peer_config_file" ]] ||
+    grep -q "^PrivateKey = ${peer_private_key}" ||
     grep -q "^PublicKey = ${SERVER_PUBLIC_KEY}"
   then
+    # Generate interface config for peer
+    should_create_backup=true
+    echo "Generating interface config for peer '${peer_name}'"
+    {
+      gen_interface_config "${peer_name}" "${peer_ip}" "${VPN_SERVER_BITS_MASK}" "" "$peer_private_key" "${PEER_DNS_SERVERS:-1.1.1.1}" false | tee "$peer_config_file"
+    } | _log "Generated interface config for peer '${peer_name}'" &> /dev/null
+
+    # Generate peer config for peer
+    echo "Generating peer config for peer '${peer_name}'"
+    {
+      gen_peer_config "Link '${peer_name}' to '${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}'" "${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}" "$SERVER_PUBLIC_KEY" "$PEER_ROUTES" "false" "${peer_psk:-}" | tee -a "$peer_config_file"
+    } | _log "Generated peer config for peer '${peer_name}'" &> /dev/null
+    echo
+  else
     echo "Peer '${peer_name}' config already exists"
     echo "Skipping"
-    continue
   fi
 
-  # Generate interface config for peer
-  should_create_backup=true
-  echo "Generating interface config for peer '${peer_name}'"
-  {
-    gen_interface_config "${peer_name}" "${peer_ip}" "${VPN_SERVER_BITS_MASK}" "" "$peer_private_key" "${PEER_DNS_SERVERS:-1.1.1.1}" false | tee "$peer_config_file"
-  } | _log "Generated interface config for peer '${peer_name}'" &> /dev/null
-
-  # Generate peer config for peer
-  echo "Generating peer config for peer '${peer_name}'"
-  {
-    gen_peer_config "Link '${peer_name}' to '${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}'" "${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}" "$SERVER_PUBLIC_KEY" "$PEER_ROUTES" "false" "${peer_psk:-}" | tee -a "$peer_config_file"
-  } | _log "Generated peer config for peer '${peer_name}'" &> /dev/null
-  echo
+  # Generate peer config QR code
+  if [[ ! -f "${peer_config_file}.png" ]]; then
+    echo "Generating peer '${peer_name}' qr code"
+    generate_qr_code_from_file "${peer_config_file}" "${peer_config_file}.png"
+  fi
 done
