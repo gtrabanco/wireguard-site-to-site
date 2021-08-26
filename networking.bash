@@ -3,11 +3,11 @@
 
 start_sudo() {
   if ! has_sudo; then
-    command -p sudo -v -B
+    command sudo -v -B
     if has_sudo && [[ -z "${SUDO_PID:-}" ]]; then
       (while true; do
-        command -p sudo -v
-        command -p sleep 30
+        command sudo -v
+        command sleep 30
       done) &
       SUDO_PID="$!"
       builtin trap stop_sudo SIGINT SIGTERM
@@ -18,11 +18,11 @@ start_sudo() {
 stop_sudo() {
   builtin kill "$SUDO_PID" &> /dev/null
   builtin trap - SIGINT SIGTERM
-  command -p sudo -k
+  command sudo -k
 }
 
 has_sudo() {
-  command -p sudo -n -v &> /dev/null
+  command sudo -n -v &> /dev/null
 }
 
 ipv4_netmask() {
@@ -388,15 +388,15 @@ gen_peer_config() {
 }
 
 iptables_remove_duplicates() {
-  command -p service "$(command -vp iptables)" save
-  command -p iptables-save | command -p awk '/^COMMIT$/ { delete x; }; !x[$0]++' | tee /tmp/iptables.conf &> /dev/null
-  command -p iptables -F
-  command -p iptables-restore < /tmp/iptables.conf
-  command -p service "$(command -vp iptables)" save
-  command -p service "$(command -vp iptables)" restart
+  command service iptables save &> /dev/null || true
+  command iptables-save | command awk '/^COMMIT$/ { delete x; }; !x[$0]++' | tee /tmp/iptables.conf &> /dev/null
+  command iptables -F
+  command iptables-restore < /tmp/iptables.conf
+  command service iptables save &> /dev/null || true
+  command service iptables restart &> /dev/null || true
 
   if [[ -f /tmp/iptables.conf ]]; then
-    command -p rm -f /tmp/iptables.conf
+    command rm -f /tmp/iptables.conf
   fi
 }
 
