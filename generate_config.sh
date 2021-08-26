@@ -69,6 +69,7 @@ if [[ ! -r "$VPN_SERVER_CONFIG_FILE" ]]; then
   echo "Generating server config"
   {
     gen_interface_config "Wireguard Server ${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}" "${VPN_SERVER_IP}" "${VPN_SERVER_BITS_MASK}" "$VPN_SERVER_PORT" "$SERVER_PRIVATE_KEY" "" 1 | tee "$VPN_SERVER_CONFIG_FILE" | _log "Generating server config" &> /dev/null
+    chmod 0600 "$VPN_SERVER_CONFIG_FILE" | _log "Setting permissions on server config"
   } | _log "Generating server config"
 
   if [[ ! -r "$VPN_SERVER_CONFIG_FILE" ]]; then
