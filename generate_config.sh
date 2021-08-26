@@ -21,6 +21,7 @@ set -euo pipefail
 #VPN_NETWORK_CDR="${VPN_SERVER_IP}/${VPN_SERVER_BITS_MASK}"
 VPN_SERVER_PORT=${VPN_SERVER_PORT:-51820}
 SSHD_SERVER_PORT=${SSHD_SERVER_PORT:-22}
+GENERATE_PEER_PSK=${GENERATE_PEER_PSK:-true}
 should_create_backup=false
 
 mkdir -p "$INTERFACE_PEERS_CONFIG_PATH" || true
@@ -104,7 +105,10 @@ for i in "${!PEERS_IP[@]}"; do
 
   peer_private_key="$(cat "$peer_private_key_file")"
   peer_public_key="$(cat "$peer_public_key_file")"
-  peer_psk=$(openssl rand -base64 "${PEER_PKS_LENGTH:-32}")
+  
+  if [[ "${GENERATE_PEER_PSK:-true}" == "true" || "${GENERATE_PEER_PSK:-true}" == "1" ]]; then
+    peer_psk=$(wg genpsk)
+  fi
 
   # Generate peer configuration to save in server config
   if ! grep -q "^PublickKey = ${peer_public_key}" "$VPN_SERVER_CONFIG_FILE"; then
