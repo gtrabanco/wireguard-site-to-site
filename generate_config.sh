@@ -114,7 +114,8 @@ for i in "${!PEERS_IP[@]}"; do
   if ! grep -q "^PublickKey = ${peer_public_key}" "$VPN_SERVER_CONFIG_FILE"; then
     should_create_backup=true
 
-    echo "Generating peer config for '${peer_name}'"
+    echo
+    echo "Generating peer config for '${peer_name}' in server config file"
     {
       gen_peer_config "${peer_name}" "" "$peer_public_key" "${peer_ip}/32" false "${peer_psk:-}" | tee -a "$VPN_SERVER_CONFIG_FILE"
     } | _log "Generated peer config for '${peer_name}'" &> /dev/null
@@ -141,11 +142,13 @@ for i in "${!PEERS_IP[@]}"; do
   } | _log "Generated interface config for peer '${peer_name}'" &> /dev/null
 
   # Generate peer config for peer
+  echo "Generating peer config for peer"
   {
     array_name="NETWORKS_CONFIG_${i}"
 
     if [[ -n "${!array_name:-}" ]]; then
       gen_peer_config "${peer_name}" "${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}" "$SERVER_PUBLIC_KEY" "$PEER_ROUTES" "false" "${peer_psk:-}" | tee -a "$peer_config_file"
     fi
-  }
+  } | _log "Generated peer config for peer '${peer_name}'" &> /dev/null
+  echo
 done
