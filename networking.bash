@@ -242,7 +242,7 @@ register_peers_routes() {
   done
 }
 
-get_all_Allowed_IPs() {
+get_all_allowed_ips() {
   local i=0 array_name="" routes=() IFS=$' '
 
   for peer_ip in "${PEERS_IP[@]}"; do
@@ -316,7 +316,7 @@ gen_interface_config() {
   # Validate bits
   [[ $bits -lt 0 || $bits -gt 32 ]] && echo "Wrong netmask bits" 1>&2 && return
 
-  local -r server_port="${3:-51820}"
+  local -r server_port="${3:-}"
   # Validate server_port
 
   local -r key="${4:-}"
@@ -326,13 +326,19 @@ gen_interface_config() {
   echo '[Interface]'
   echo "# Name = ${name}"
   echo "Address = ${ip_address}/${bits}"
-  echo "ListenPort = ${server_port}"
+
+  if [[ -n "$server_port" ]]; then
+    echo "ListenPort = ${server_port}"
+  fi
+
   echo "PrivateKey = ${key}"
   
   if [[ -n "${dns_servers:-}" ]]; then
     echo "DNS = $dns_servers"
   fi
   
+  [[ -n "${VPN_SERVER_IP}" && "${VPN_SERVER_IP}" != "$ip_address" ]] && echo "PostUp = ping -c1 ${VPN_SERVER_IP}"
+
   if [[ "${post_exec:-true}" == "true" || "${post_exec:-}" == "1" ]]; then
     echo "PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE"
     echo 'PostUp = echo "$(date +%s) WireGuard Started" >> /var/log/wireguard.log'
@@ -362,7 +368,11 @@ gen_peer_config() {
 
   echo '[Peer]'
   echo "# Name = ${name}"
-  echo "Endpoint = ${server_address}"
+  
+  if [[ -n "$server_address" ]]; then
+    echo "Endpoint = ${server_address}"
+  fi
+
   echo "PublicKey = ${key}"
   
   if [[ -n "$pre_shared_key" ]]; then
@@ -393,4 +403,22 @@ iptables_remove_duplicates() {
 show_file_as_qr() {
   [[ ! -r "${1:-}" ]] && return 1
   qrencode -t UTF8 < "${1:-}"
+}
+
+_log () {
+  if [[ $# -gt 0 ]]; then
+    printf "%s\n" "$@" | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}" &> /dev/null
+  fi
+  
+  if [[ ! -t 0 ]]; then
+    printf "%s\n" "$(< /dev/stdin)" | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}"
+  fi
+
+  echo | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}" &> /dev/null
+}
+
+_log_exec() {
+  echo "$*" | _log "Executing command" &> /dev/null
+  "$@" 2>&1 | _log "Command output"
+  echo "End of command execution" | _log &> /dev/null
 }
