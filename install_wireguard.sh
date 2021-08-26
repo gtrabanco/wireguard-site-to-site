@@ -50,7 +50,7 @@ if ! ${IGNORE_IPTABLES_CONFIG:-false}; then
   # to add iptables forwarding rules on bounce servers
   iptables -P INPUT DROP
   iptables -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-  iptables -I INPUT -p udp --dport "$${VPN_SERVER_PORT:-51820}" -j ACCEPT
+  iptables -I INPUT -p udp --dport "${VPN_SERVER_PORT:-51820}" -j ACCEPT
   iptables -I INPUT -p tcp -m tcp --dport "${SSHD_SERVER_PORT:-22}" -j ACCEPT
   iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
   iptables -A FORWARD -i "${VPN_SERVER_WG0:-wg0}" -o "${VPN_SERVER_WG0:-wg0}" -m conntrack --ctstate NEW -j ACCEPT
