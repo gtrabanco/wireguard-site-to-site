@@ -142,7 +142,7 @@ for i in "${!PEERS_IP[@]}"; do
   } | _log "Generated interface config for peer '${peer_name}'" &> /dev/null
 
   # Generate peer config for peer
-  echo "Generating peer config for peer"
+  echo "Generating peer config for peer '${peer_name}'"
   {
     array_name="NETWORKS_CONFIG_${i}"
 
