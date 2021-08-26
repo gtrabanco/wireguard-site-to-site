@@ -106,14 +106,14 @@ for i in "${!PEERS_IP[@]}"; do
 
   peer_private_key="$(cat "$peer_private_key_file")"
   peer_public_key="$(cat "$peer_public_key_file")"
-  
-  if [[ "${GENERATE_PEER_PSK:-true}" == "true" || "${GENERATE_PEER_PSK:-true}" == "1" ]]; then
-    peer_psk=$(wg genpsk)
-  fi
 
   # Generate peer configuration to save in server config
   if ! grep -q "^PublicKey = ${peer_public_key}" "$VPN_SERVER_CONFIG_FILE"; then
     should_create_backup=true
+
+    if [[ "${GENERATE_PEER_PSK:-true}" == "true" || "${GENERATE_PEER_PSK:-true}" == "1" ]]; then
+      peer_psk=$(wg genpsk)
+    fi
 
     echo
     echo "Generating peer config for '${peer_name}' in server config file"
@@ -122,6 +122,7 @@ for i in "${!PEERS_IP[@]}"; do
     } | _log "Generated peer config for '${peer_name}'" &> /dev/null
   else
     echo "Peer '${peer_name}' already exists in server config"
+    echo "If configuration is created Pre Shared Key should be added later manually"
   fi
 
   # Check if peer config already exists
