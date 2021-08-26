@@ -1,6 +1,29 @@
 #!/usr/bin/env bash
 #shellcheck disable=SC2206,SC2207,SC2016
 
+start_sudo() {
+  if ! has_sudo; then
+    command sudo -v -B
+    if has_sudo && [[ -z "${SUDO_PID:-}" ]]; then
+      (while true; do
+        command sudo -v
+        command sleep 30
+      done) &
+      SUDO_PID="$!"
+      builtin trap stop_sudo SIGINT SIGTERM
+    fi
+  fi
+}
+
+stop_sudo() {
+  builtin kill "$SUDO_PID" &> /dev/null
+  builtin trap - SIGINT SIGTERM
+  command sudo -k
+}
+
+has_sudo() {
+  command sudo -n -v &> /dev/null
+}
 
 ipv4_netmask() {
   local IFS='.' netmask=() rest_bits tmp_netmask=0
@@ -157,9 +180,9 @@ startWG() {
   local -r file="${2:-${VPN_SERVER_CONFIG_FILE:-/etc/wireguard/${interface}.conf}}"
   local -r server_ip="${1:-${VPN_SERVER_IP:-10.0.0.1}}"
   wg-quick up "$file"
-  ip link add dev "$interface" type wireguard
-  ip address add dev "$interface" "${server_ip}/32"
-  ip route add "${server_ip}/32" dev wg0
+  ip link add dev "$interface" type wireguard || echo "Wireguard interface already exists"
+  ip address add dev "$interface" "${server_ip}/32" || echo "Interface address was not added"
+  ip route add "${server_ip}/32" dev wg0 || echo "Route to ${server_ip} was not added"
   
   register_peers_routes
 }
@@ -168,10 +191,10 @@ stopWG() {
   local -r interface="${3:-${VPN_SERVER_WG0:-wg0}}"
   local -r file="${2:-${VPN_SERVER_CONFIG_FILE:-/etc/wireguard/${interface}.conf}}"
   local -r server_ip="${1:-${VPN_SERVER_IP:-10.0.0.1}}"
-  wg-quick down "$file"
-  ip link delete dev "$interface" type wireguard
-  ip address delete dev "$interface" "${server_ip}/32"
-  ip route delete "${server_ip}/32" dev wg0
+  wg-quick down "$file" || true
+  ip link delete dev "$interface" type wireguard || true
+  ip address delete dev "$interface" "${server_ip}/32" || true
+  ip route delete "${server_ip}/32" dev wg0 || true
 }
 
 register_route() {
@@ -219,7 +242,7 @@ register_peers_routes() {
   done
 }
 
-get_all_Allowed_IPs() {
+get_all_allowed_ips() {
   local i=0 array_name="" routes=() IFS=$' '
 
   for peer_ip in "${PEERS_IP[@]}"; do
@@ -246,17 +269,40 @@ get_all_Allowed_IPs() {
   fi
 }
 
+gen_pair_of_keys() {
+  local -r private_key_file_path="${1:-}"
+  local public_key_file_path="${2:-${private_key_file_path}.pub}"
+
+  if
+    [[
+      -z "$private_key_file_path" ||
+      -r "$private_key_file_path" ||
+      -r "$public_key_file_path"
+    ]]
+  then
+    echo "Empty private/public key file path or private or public key file already exists" 1>&2
+    return 1
+  fi
+
+  umask 077
+  wg genkey | tee "$private_key_file_path" | wg pubkey | tee "$public_key_file_path" &> /dev/null
+  umask 022
+}
+
 #"
-# getnInterfaceConfig()
+# gen_interface_config()
 # Generate a config for wg Interface
+# @param string name
 # @param string ip_address
 # @param string netmask (bits) This param can be ignored if it is included with the ip address
 # @param string server_port
-# @param string private_key If none it will be generated
-# @param string dns_servers If none, it will use 1.1.1.1
+# @param string key If none it will be generated
+# @param string dns_servers If none won't add it
+# @param boolean post_exec
 #;
-genInterfaceConfig() {
-  local -r ip_address="${1:-}"
+gen_interface_config() {
+  local -r name="${1:-}"
+  local -r ip_address="${2:-}"
 
   [[ -z "$ip_address" ]] && echo "Needs an IP address" 1>&2 && return
   ! type wg &> /dev/null && echo "Is wireguard installed?" 1>&2 && return
@@ -264,38 +310,69 @@ genInterfaceConfig() {
   if [[ -n "$(ipGetMask "$ip_address")" ]]; then
     local -r bits="$(ipv4_bits "$(ipGetMask "$ip_address")" || echo -n)"
   else
-    local -r bits="$(ipv4_bits "${2:-0}" || echo -n)"
+    local -r bits="$(ipv4_bits "${3:-0}" || echo -n)"
+    shift
   fi
   # Validate bits
   [[ $bits -lt 0 || $bits -gt 32 ]] && echo "Wrong netmask bits" 1>&2 && return
 
-  local -r server_port="${3:-51820}"
+  local -r server_port="${3:-}"
   # Validate server_port
 
-  local -r private_key="${4:-$(wg genkey)}"
+  local -r key="${4:-}"
+  local -r dns_servers="${5:-}"
+  local -r post_exec=${6:-false}
 
   echo '[Interface]'
+  echo "# Name = ${name}"
   echo "Address = ${ip_address}/${bits}"
-  echo "ListenPort = ${server_port}"
-  echo "PrivateKey = ${private_key}"
-  echo "DNS = ${5:-1.1.1.1}"
-  echo "PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE"
-  echo 'PostUp = echo "$(date +%s) WireGuard Started" >> /var/log/wireguard.log'
-  echo "PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE"
-  echo 'PostDown = echo "$(date +%s) WireGuard Going Down" >> /var/log/wireguard.log'
+
+  if [[ -n "$server_port" ]]; then
+    echo "ListenPort = ${server_port}"
+  fi
+
+  echo "PrivateKey = ${key}"
   
+  if [[ -n "${dns_servers:-}" ]]; then
+    echo "DNS = $dns_servers"
+  fi
+
+  if [[ "${post_exec:-true}" == "true" || "${post_exec:-}" == "1" ]]; then
+    [[ -n "${VPN_SERVER_IP}" && "${VPN_SERVER_IP}" != "$ip_address" ]] && echo "PostUp = ping -c1 ${VPN_SERVER_IP}"
+    echo "PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE"
+    echo 'PostUp = echo "$(date +%s) WireGuard Started" >> /var/log/wireguard.log'
+    echo "PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE"
+    echo 'PostDown = echo "$(date +%s) WireGuard Going Down" >> /var/log/wireguard.log'
+  fi
+  echo
 }
 
-genPeerConfig() {
-  local -r server_address="${1:-}"
-  local -r public_key="${2:-}"
-  local -r allowed_ips="${3:-0.0.0.0/0, ::/0}"
-  local -r is_nat=${4:-false}
-  local -r pre_shared_key="${5:-}"
+#"
+# gen_peer_config()
+# Generate a config for wg Interface
+# @param string name
+# @param string server_address
+# @param string key
+# @param string allowed_ips
+# @param string is_nat
+# @param string pre_shared_key
+#;
+gen_peer_config() {
+  local -r name="${1:-}"
+  local -r server_address="${2:-}"
+  local -r key="${3:-}"
+  local -r allowed_ips="${4:-0.0.0.0/0, ::/0}"
+  local -r is_nat=${5:-false}
+  local -r pre_shared_key="${6:-}"
 
   echo '[Peer]'
-  echo "Endpoint = ${server_address}"
-  echo "PublicKey = ${public_key}"
+  echo "# Name = ${name}"
+  
+  if [[ -n "$server_address" ]]; then
+    echo "Endpoint = ${server_address}"
+  fi
+
+  echo "PublicKey = ${key}"
   
   if [[ -n "$pre_shared_key" ]]; then
     echo "PresharedKey = ${pre_shared_key}"
@@ -306,4 +383,67 @@ genPeerConfig() {
   fi
 
   echo "AllowedIPs = ${allowed_ips}"
+  echo
+}
+
+iptables_remove_duplicates() {
+  command service iptables save &> /dev/null || true
+  command iptables-save | command awk '/^COMMIT$/ { delete x; }; !x[$0]++' | tee /tmp/iptables.conf &> /dev/null
+  command iptables -F
+  command iptables-restore < /tmp/iptables.conf
+  command service iptables save &> /dev/null || true
+  command service iptables restart &> /dev/null || true
+
+  if [[ -f /tmp/iptables.conf ]]; then
+    command rm -f /tmp/iptables.conf
+  fi
+}
+
+qrencode_dependency_installed() {
+  if
+    ! command -v qrencode &> /dev/null &&
+    command -v apt &> /dev/null &&
+    ! dpkg --list "wireguard" &> /dev/null
+  then
+    echo "Installing qrencode dependency"
+    command sudo apt-get install -y qrencode &> /dev/null
+    if
+      command -v apt &> /dev/null &&
+      ! dpkg --list "wireguard" &> /dev/null
+    then
+      echo "Failed to install qrencode dependency" 1>&2
+      return 1
+    fi
+  fi
+}
+
+show_file_as_qr() {
+  [[ ! -r "${1:-}" ]] && return 1
+  ! qrencode_dependency_installed && return 1
+  qrencode -m 2 -t ansiutf8 <<< "$1"
+}
+
+generate_qr_code_from_file() {
+  [[ ! -r "${1:-}" || -z "${2:-}" ]] && return 1
+  ! qrencode_dependency_installed && return 1
+
+  qrencode -m 2 -t ansiutf8 -o "${2:-}" <<< "$1"
+}
+
+_log () {
+  if [[ $# -gt 0 ]]; then
+    printf "%s\n" "$@" | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}" &> /dev/null
+  fi
+  
+  if [[ ! -t 0 ]]; then
+    printf "%s\n" "$(< /dev/stdin)" | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}"
+  fi
+
+  echo | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}" &> /dev/null
+}
+
+_log_exec() {
+  echo "$*" | _log "Executing command" &> /dev/null
+  "$@" 2>&1 | _log "Command output"
+  echo "End of command execution" | _log &> /dev/null
 }
