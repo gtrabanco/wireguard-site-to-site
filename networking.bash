@@ -180,9 +180,9 @@ startWG() {
   local -r file="${2:-${VPN_SERVER_CONFIG_FILE:-/etc/wireguard/${interface}.conf}}"
   local -r server_ip="${1:-${VPN_SERVER_IP:-10.0.0.1}}"
   wg-quick up "$file"
-  ip link add dev "$interface" type wireguard
-  ip address add dev "$interface" "${server_ip}/32"
-  ip route add "${server_ip}/32" dev wg0
+  ip link add dev "$interface" type wireguard || echo "Wireguard interface already exists"
+  ip address add dev "$interface" "${server_ip}/32" || echo "Interface address was not added"
+  ip route add "${server_ip}/32" dev wg0 || echo "Route to ${server_ip} was not added"
   
   register_peers_routes
 }
@@ -191,10 +191,10 @@ stopWG() {
   local -r interface="${3:-${VPN_SERVER_WG0:-wg0}}"
   local -r file="${2:-${VPN_SERVER_CONFIG_FILE:-/etc/wireguard/${interface}.conf}}"
   local -r server_ip="${1:-${VPN_SERVER_IP:-10.0.0.1}}"
-  wg-quick down "$file"
-  ip link delete dev "$interface" type wireguard
-  ip address delete dev "$interface" "${server_ip}/32"
-  ip route delete "${server_ip}/32" dev wg0
+  wg-quick down "$file" || true
+  ip link delete dev "$interface" type wireguard || true
+  ip address delete dev "$interface" "${server_ip}/32" || true
+  ip route delete "${server_ip}/32" dev wg0 || true
 }
 
 register_route() {
