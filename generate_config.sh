@@ -149,9 +149,3 @@ for i in "${!PEERS_IP[@]}"; do
     fi
   }
 done
-
-# Register routes to peers
-register_peers_routes
-
-# Start wireguard
-stopWG && startWG
