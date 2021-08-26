@@ -112,7 +112,7 @@ for i in "${!PEERS_IP[@]}"; do
   fi
 
   # Generate peer configuration to save in server config
-  if ! grep -q "^PublickKey = ${peer_public_key}" "$VPN_SERVER_CONFIG_FILE"; then
+  if ! grep -q "^PublicKey = ${peer_public_key}" "$VPN_SERVER_CONFIG_FILE"; then
     should_create_backup=true
 
     echo
