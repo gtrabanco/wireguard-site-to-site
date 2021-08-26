@@ -82,7 +82,7 @@ fi
 
 # Generate peers configuration
 for i in "${!PEERS_IP[@]}"; do
-  peer_ip="" peer_name="" peer_config_file="" peer
+  peer_ip="" peer_name="" peer_config_file="" peer_private_key="" peer_public_key="" peer_psk=""
   peer_ip="${PEERS_IP[$i]}"
   peer_name="${PEERS_NAMES[$i]:-$peer_ip}"
   peer_config_file="${INTERFACE_PEERS_CONFIG_PATH}/${peer_ip}"
