@@ -336,10 +336,9 @@ gen_interface_config() {
   if [[ -n "${dns_servers:-}" ]]; then
     echo "DNS = $dns_servers"
   fi
-  
-  [[ -n "${VPN_SERVER_IP}" && "${VPN_SERVER_IP}" != "$ip_address" ]] && echo "PostUp = ping -c1 ${VPN_SERVER_IP}"
 
   if [[ "${post_exec:-true}" == "true" || "${post_exec:-}" == "1" ]]; then
+    [[ -n "${VPN_SERVER_IP}" && "${VPN_SERVER_IP}" != "$ip_address" ]] && echo "PostUp = ping -c1 ${VPN_SERVER_IP}"
     echo "PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE"
     echo 'PostUp = echo "$(date +%s) WireGuard Started" >> /var/log/wireguard.log'
     echo "PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE"
