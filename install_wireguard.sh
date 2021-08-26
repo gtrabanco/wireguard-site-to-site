@@ -8,6 +8,12 @@ set -euo pipefail
 . "$(dirname "$BASH_SOURCE")/networking.bash"
 . "$(dirname "$BASH_SOURCE")/.env"
 
+[[
+  -z "${VPN_SERVER_IP:-}" ||
+  -z "${VPN_SERVER_BITS_MASK:-}"
+]] && echo "Empty ip or network mask" && exit 4
+
+VPN_NETWORK_CDR="${VPN_SERVER_IP}/${VPN_SERVER_BITS_MASK}"
 sysctl_modified=false
 
 start_sudo
