@@ -103,7 +103,7 @@ for i in "${!PEERS_IP[@]}"; do
 
   peer_private_key="$(cat "$peer_private_key_file")"
   peer_public_key="$(cat "$peer_public_key_file")"
-  peer_pks=$(openssl rand -base64 "${PEER_PKS_LENGTH:-32}")
+  peer_psk=$(openssl rand -base64 "${PEER_PKS_LENGTH:-32}")
 
   # Generate peer configuration to save in server config
   if ! grep -q "^PublickKey = ${peer_public_key}" "$VPN_SERVER_CONFIG_FILE"; then
