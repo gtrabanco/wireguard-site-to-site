@@ -82,6 +82,7 @@ fi
 
 # Generate peers configuration
 for i in "${!PEERS_IP[@]}"; do
+  peer_ip="" peer_name="" peer_config_file="" peer
   peer_ip="${PEERS_IP[$i]}"
   peer_name="${PEERS_NAMES[$i]:-$peer_ip}"
   peer_config_file="${INTERFACE_PEERS_CONFIG_PATH}/${peer_ip}"
@@ -144,11 +145,7 @@ for i in "${!PEERS_IP[@]}"; do
   # Generate peer config for peer
   echo "Generating peer config for peer '${peer_name}'"
   {
-    array_name="NETWORKS_CONFIG_${i}"
-
-    if [[ -n "${!array_name:-}" ]]; then
-      gen_peer_config "${peer_name}" "${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}" "$SERVER_PUBLIC_KEY" "$PEER_ROUTES" "false" "${peer_psk:-}" | tee -a "$peer_config_file"
-    fi
+    gen_peer_config "Link '${peer_name}' to '${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}'" "${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}" "$SERVER_PUBLIC_KEY" "$PEER_ROUTES" "false" "${peer_psk:-}" | tee -a "$peer_config_file"
   } | _log "Generated peer config for peer '${peer_name}'" &> /dev/null
   echo
 done
