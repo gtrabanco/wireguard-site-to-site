@@ -6,6 +6,7 @@ set -euo pipefail
 [[ $UID == 0 ]] || { echo "You must be root to run this."; exit 1; }
 
 . "$(dirname "$BASH_SOURCE")/networking.bash"
+. "$(dirname "$BASH_SOURCE")/.env"
 
 sysctl_modified=false
 
