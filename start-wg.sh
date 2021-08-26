@@ -14,8 +14,11 @@ if [[ ! -r "$VPN_SERVER_CONFIG_FILE" ]]; then
   exit 5
 fi
 
+# Start wireguard
+stopWG
+sleep 1s
+startWG
+sleep 1s
+
 # Register routes to peers
 register_peers_routes
-
-# Start wireguard
-stopWG && startWG
