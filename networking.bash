@@ -182,7 +182,7 @@ startWG() {
   wg-quick up "$file"
   ip link add dev "$interface" type wireguard || echo "Wireguard interface already exists"
   ip address add dev "$interface" "${server_ip}/32" || echo "Interface address was not added"
-  ip route add "${server_ip}/32" dev wg0 || echo "Route to ${server_ip} was not added"
+  ip route add "${server_ip}/32" dev "${interface}" || echo "Route to ${server_ip} was not added"
   
   register_peers_routes
 }
@@ -194,7 +194,7 @@ stopWG() {
   wg-quick down "$file" || true
   ip link delete dev "$interface" type wireguard || true
   ip address delete dev "$interface" "${server_ip}/32" || true
-  ip route delete "${server_ip}/32" dev wg0 || true
+  ip route delete "${server_ip}/32" dev "${interface}" || true
 }
 
 register_route() {
@@ -218,7 +218,7 @@ register_route() {
       return 1
     fi
 
-    echo ip route add "$cidr" via "$gateway"
+    ip route add "$cidr" via "$gateway"
   done
 }
 
