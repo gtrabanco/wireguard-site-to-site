@@ -3,7 +3,7 @@
 
 set -euo pipefail
 
-#[[ $UID == 0 ]] || { echo "You must be root to run this."; exit 1; }
+[[ $UID == 0 ]] || { echo "You must be root to run this."; exit 1; }
 
 . "$(dirname "$BASH_SOURCE")/networking.bash"
 . "$(dirname "$BASH_SOURCE")/.env"
@@ -11,6 +11,13 @@ set -euo pipefail
 
 if [[ ! -r "$VPN_SERVER_CONFIG_FILE" ]]; then
   echo "The VPN server config file '${VPN_SERVER_CONFIG_FILE}' is not readable"
+  exit 5
+fi
+
+start_sudo
+
+if ! has_sudo; then
+  echo "sudo is necessary"
   exit 5
 fi
 
