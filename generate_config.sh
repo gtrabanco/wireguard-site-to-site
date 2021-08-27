@@ -86,6 +86,7 @@ for i in "${!PEERS_IP[@]}"; do
   peer_ip="${PEERS_IP[$i]}"
   peer_name="${PEERS_NAMES[$i]:-$peer_ip}"
   peer_config_file="${INTERFACE_PEERS_CONFIG_PATH}/${peer_ip}"
+  is_behind_nat=false
 
   # Gerating keys
   peer_private_key_file="${INTERFACE_STORE_KEYS_PATH}/${peer_ip}"
@@ -118,16 +119,18 @@ for i in "${!PEERS_IP[@]}"; do
     echo
     echo "Generating peer config for '${peer_name}' in server config file"
 
-    ARRAY_NETWORKS_PEER_NAME="NETWORKS_CONFIG_${i}"
-    REACHED_NETWORKS_PEER="${peer_ip}/32"
-    if [[ -n $(eval "echo \"\${${ARRAY_NETWORKS_PEER_NAME}[*]:-}\"") ]]; then
-      for net in "${!ARRAY_NETWORKS_PEER_NAME[@]}"; do
-        REACHED_NETWORKS_PEER="${REACHED_NETWORKS_PEER}, ${net}"
-      done
+    ARRAY_NETWORKS_PEER_VAR_NAME="NETWORKS_CONFIG_${i}"
+    REACHED_NETWORKS_PEER="$(get_peer_index_networks "$i")"
+    if [[ -n "${REACHED_NETWORKS_PEER:-}" ]]; then
+      REACHED_NETWORKS_PEER="${peer_ip}/32, ${REACHED_NETWORKS_PEER}"
+    else
+      REACHED_NETWORKS_PEER="${peer_ip}/32"
+      is_behind_nat=true
+      echo "No other networks found for '${peer_name}'"
     fi
     {
       # Should add in peer_ip a comma separated list of all reachable networks
-      gen_peer_config "${peer_name}" "" "$peer_public_key" "${peer_ip}/32" false "${peer_psk:-}" | tee -a "$VPN_SERVER_CONFIG_FILE"
+      gen_peer_config "${peer_name}" "" "$peer_public_key" "${REACHED_NETWORKS_PEER}" false "${peer_psk:-}" | tee -a "$VPN_SERVER_CONFIG_FILE"
     } | _log "Generated peer config for '${peer_name}'" &> /dev/null
   else
     echo "Peer '${peer_name}' already exists in server config"
@@ -150,7 +153,7 @@ for i in "${!PEERS_IP[@]}"; do
     # Generate peer config for peer
     echo "Generating peer config for peer '${peer_name}'"
     {
-      gen_peer_config "Link '${peer_name}' to '${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}'" "${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}" "$SERVER_PUBLIC_KEY" "$PEER_ROUTES" "false" "${peer_psk:-}" | tee -a "$peer_config_file"
+      gen_peer_config "Link '${peer_name}' to '${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}'" "${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}" "$SERVER_PUBLIC_KEY" "$PEER_ROUTES" "${is_behind_nat:-false}" "${peer_psk:-}" | tee -a "$peer_config_file"
     } | _log "Generated peer config for peer '${peer_name}'" &> /dev/null
     echo
   else
