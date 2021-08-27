@@ -21,6 +21,9 @@ if ! has_sudo; then
   exit 5
 fi
 
+./stop-wg.sh &> /dev/null || true
+
+sudo systemctl enable --now systemd-resolved
 sudo systemctl enable "wg-quick@${VPN_SERVER_WG0}.service"
 sudo systemctl daemon-reload
 sudo systemctl start wg-quick@wg0
