@@ -183,8 +183,7 @@ startWG() {
   ip link add dev "$interface" type wireguard || echo "Wireguard interface already exists"
   ip address add dev "$interface" "${server_ip}/32" || echo "Interface address was not added"
   ip route add "${server_ip}/32" dev "${interface}" || echo "Route to ${server_ip} was not added"
-  
-  register_peers_routes
+  # register_peers_routes
 }
 
 stopWG() {
