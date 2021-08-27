@@ -120,7 +120,7 @@ for i in "${!PEERS_IP[@]}"; do
 
     ARRAY_NETWORKS_PEER_NAME="NETWORKS_CONFIG_${i}"
     REACHED_NETWORKS_PEER="${peer_ip}/32"
-    if [[ $(eval "[[ -n \"\$${ARRAY_NETWORKS_PEER_NAME}\" ]] && \${#${ARRAY_NETWORKS_PEER_NAME}[@]}" || echo 0) -gt 0 ]]; then
+    if [[ -n $(eval "echo \"\${${ARRAY_NETWORKS_PEER_NAME}[*]:-}\"") ]]; then
       for net in "${!ARRAY_NETWORKS_PEER_NAME[@]}"; do
         REACHED_NETWORKS_PEER="${REACHED_NETWORKS_PEER}, ${net}"
       done
