@@ -12,7 +12,7 @@ Install wireguard-tools to generate the configuration.
 
 ```bash
 ! { command -v brew &> /dev/null; } && /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-! brew list wireguard-tools &> /dev/null && brew install wireguard wireguard-tools
+! brew list wireguard-tools &> /dev/null && brew install wireguard-go wireguard-tools
 ```
 
 2. Configure `.env.dist` and rename to `.env`
