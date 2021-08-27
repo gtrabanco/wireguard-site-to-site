@@ -183,8 +183,7 @@ startWG() {
   ip link add dev "$interface" type wireguard || echo "Wireguard interface already exists"
   ip address add dev "$interface" "${server_ip}/32" || echo "Interface address was not added"
   ip route add "${server_ip}/32" dev "${interface}" || echo "Route to ${server_ip} was not added"
-  
-  register_peers_routes
+  # register_peers_routes
 }
 
 stopWG() {
@@ -240,6 +239,30 @@ register_peers_routes() {
     routes=()
     array_name=""
   done
+}
+
+get_peer_index_networks() {
+  local array_name="" routes=() IFS
+
+  local -r i="${1:-}"
+  local -r peer_ip="${PEERS_IP[$i]:-}"
+  [[ -z "$i" || -z "$peer_ip" ]] && return
+
+  if ! validateIP "$peer_ip"; then
+    echo "Peer IP '$peer_ip' is invalid ip address" 1>&2
+    return
+  fi
+
+  array_name="NETWORKS_CONFIG_${i}"
+  
+  if [[ -n "${!array_name:-}" ]]; then
+    routes=($(eval "echo \${${array_name}[@]}"))
+  fi
+
+  if [[ ${#routes[@]} -gt 0 ]]; then
+    IFS=','
+    echo "${routes[*]}"
+  fi
 }
 
 get_all_allowed_ips() {
@@ -339,9 +362,9 @@ gen_interface_config() {
 
   if [[ "${post_exec:-true}" == "true" || "${post_exec:-}" == "1" ]]; then
     [[ -n "${VPN_SERVER_IP}" && "${VPN_SERVER_IP}" != "$ip_address" ]] && echo "PostUp = ping -c1 ${VPN_SERVER_IP}"
-    echo "PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE"
+    echo 'PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE'
     echo 'PostUp = echo "$(date +%s) WireGuard Started" >> /var/log/wireguard.log'
-    echo "PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE"
+    echo 'PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE'
     echo 'PostDown = echo "$(date +%s) WireGuard Going Down" >> /var/log/wireguard.log'
   fi
   echo

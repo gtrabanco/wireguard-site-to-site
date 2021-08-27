@@ -19,6 +19,3 @@ stopWG
 sleep 1s
 startWG
 sleep 1s
-
-# Register routes to peers
-register_peers_routes
