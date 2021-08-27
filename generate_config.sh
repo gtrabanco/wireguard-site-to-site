@@ -117,6 +117,14 @@ for i in "${!PEERS_IP[@]}"; do
 
     echo
     echo "Generating peer config for '${peer_name}' in server config file"
+
+    ARRAY_NETWORKS_PEER_NAME="NETWORKS_CONFIG_${i}"
+    REACHED_NETWORKS_PEER="${peer_ip}/32"
+    if [[ ${#!ARRAY_NETWORKS_PEER_NAME[@]} -gt 0 ]]; then
+      for net in "${!ARRAY_NETWORKS_PEER_NAME[@]}"; do
+        REACHED_NETWORKS_PEER="${REACHED_NETWORKS_PEER}, ${net}"
+      done
+    fi
     {
       # Should add in peer_ip a comma separated list of all reachable networks
       gen_peer_config "${peer_name}" "" "$peer_public_key" "${peer_ip}/32" false "${peer_psk:-}" | tee -a "$VPN_SERVER_CONFIG_FILE"
