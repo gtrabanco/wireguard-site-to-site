@@ -21,8 +21,13 @@ if ! has_sudo; then
   exit 5
 fi
 
-# Start wireguard
-stopWG
-sleep 1s
-startWG
-sleep 1s
+sudo systemctl enable "wg-quick@${VPN_SERVER_WG0}.service"
+sudo systemctl daemon-reload
+sudo systemctl start wg-quick@wg0
+
+# To remove service
+# sudo systemctl stop wg-quick@wg0
+# sudo systemctl disable wg-quick@wg0.service
+# sudo rm -i /etc/systemd/system/wg-quick@wg0*
+# sudo systemctl daemon-reload
+# sudo systemctl reset-failed
