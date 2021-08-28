@@ -8,6 +8,13 @@ set -euo pipefail
 . "$(dirname "$BASH_SOURCE")/networking.bash"
 . "$(dirname "$BASH_SOURCE")/.env"
 
+if [[ ! -f "/etc/os-release" ]]; then
+  echo "Linux release info could not be found" 1>&2
+  exit 4
+fi
+
+. "/etc/os-release"
+
 [[
   -z "${VPN_SERVER_IP:-}" ||
   -z "${VPN_SERVER_BITS_MASK:-}"
@@ -24,8 +31,15 @@ if ! has_sudo; then
 fi
 
 # Install wireguard
-if [[ ! -f "/etc/apt/sources.list.d/backports.list" ]]; then
-  echo "deb http://deb.debian.org/debian buster-backports main" | sudo tee /etc/apt/sources.list.d/backports.list
+if [[ "${NAME:-other}" == "Debian GNU/Linux" ]]; then
+  if [[ ! -f "/etc/apt/sources.list.d/backports.list" ]]; then
+    echo "deb http://deb.debian.org/debian ${VERSION_CODENAME}-backports main" | sudo tee /etc/apt/sources.list.d/backports.list
+  fi
+elif [[ "${NAME:-other}" == "Ubuntu" ]]; then
+  command sudo add-apt-repository ppa:wireguard/wireguard
+else
+  echo "This script is only for Debian or Ubuntu" 1>&2
+  exit 10
 fi
 
 if
@@ -34,8 +48,8 @@ if
   ! dpkg --list "wireguard-dkms" &> /dev/null &&
   ! dpkg --list "wireguard-tools" &> /dev/null
 then
-  sudo apt update && sudo apt upgrade -y
-  sudo apt install -y wireguard wireguard-dkms wireguard-tools
+  command sudo apt update && sudo apt upgrade -y
+  command sudo apt install -y wireguard wireguard-dkms wireguard-tools
 fi
 
 if ! grep -q '^net.ipv4.ip_forward = 1$' /etc/sysctl.conf; then
