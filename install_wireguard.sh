@@ -8,6 +8,13 @@ set -euo pipefail
 . "$(dirname "$BASH_SOURCE")/networking.bash"
 . "$(dirname "$BASH_SOURCE")/.env"
 
+if [[ ! -f "/etc/os-release" ]]; then
+  echo "Linux release info could not be found" 1>&2
+  exit 4
+fi
+
+. "/etc/os-release"
+
 [[
   -z "${VPN_SERVER_IP:-}" ||
   -z "${VPN_SERVER_BITS_MASK:-}"
@@ -24,8 +31,15 @@ if ! has_sudo; then
 fi
 
 # Install wireguard
-if [[ ! -f "/etc/apt/sources.list.d/backports.list" ]]; then
-  echo "deb http://deb.debian.org/debian buster-backports main" | sudo tee /etc/apt/sources.list.d/backports.list
+if [[ "${NAME:-other}" == "Debian GNU/Linux" ]]; then
+  if [[ ! -f "/etc/apt/sources.list.d/backports.list" ]]; then
+    echo "deb http://deb.debian.org/debian ${VERSION_CODENAME}-backports main" | sudo tee /etc/apt/sources.list.d/backports.list
+  fi
+elif [[ "${NAME:-other}" == "Ubuntu" ]]; then
+  command sudo add-apt-repository ppa:wireguard/wireguard
+else
+  echo "This script is only for Debian or Ubuntu" 1>&2
+  exit 10
 fi
 
 if
@@ -34,8 +48,9 @@ if
   ! dpkg --list "wireguard-dkms" &> /dev/null &&
   ! dpkg --list "wireguard-tools" &> /dev/null
 then
-  sudo apt update && sudo apt upgrade -y
-  sudo apt install -y wireguard wireguard-dkms wireguard-tools
+  command sudo apt update && sudo apt upgrade -y
+  command sudo apt install -y wireguard wireguard-dkms wireguard-tools
+  command sudo apt install -y iptables-persistent
 fi
 
 if ! grep -q '^net.ipv4.ip_forward = 1$' /etc/sysctl.conf; then
@@ -54,16 +69,26 @@ fi
 
 if ! ${IGNORE_IPTABLES_CONFIG:-false}; then
   # to add iptables forwarding rules on bounce servers
-  iptables -P INPUT DROP
-  iptables -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-  iptables -I INPUT -p udp --dport "${VPN_SERVER_PORT:-51820}" -j ACCEPT
-  iptables -I INPUT -p tcp -m tcp --dport "${SSHD_SERVER_PORT:-22}" -j ACCEPT
-  iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-  iptables -A FORWARD -i "${VPN_SERVER_WG0:-wg0}" -o "${VPN_SERVER_WG0:-wg0}" -m conntrack --ctstate NEW -j ACCEPT
-  iptables -t nat -A POSTROUTING -s "$VPN_NETWORK_CDR" -o "${VPN_SERVER_ETH:-eth0}" -j MASQUERADE
+  command sudo iptables -P INPUT DROP
+  command sudo iptables -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+  command sudo iptables -I INPUT -p udp --dport "${VPN_SERVER_PORT:-51820}" -j ACCEPT
+  command sudo iptables -I INPUT -p tcp -m tcp --dport "${SSHD_SERVER_PORT:-22}" -j ACCEPT
+  command sudo iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+  command sudo iptables -A FORWARD -i "${VPN_SERVER_WG0:-wg0}" -o "${VPN_SERVER_WG0:-wg0}" -m conntrack --ctstate NEW -j ACCEPT
+  command sudo iptables -t nat -A POSTROUTING -s "$VPN_NETWORK_CDR" -o "${VPN_SERVER_ETH:-eth0}" -j MASQUERADE
 
   # Remove duplicated iptables rules
   iptables_remove_duplicates
+
+  if dpkg --list "iptables-persistent" &> /dev/null; then
+    echo "Saving firewall rules"
+    command sudo iptables-save | command sudo tee /etc/iptables/rules.v4
+    command sudo ip6tables-save | command sudo tee /etc/iptables/rules.v6
+    command sudo service iptables stop
+    command sudo service iptables start
+  else
+    echo "Firewall rules are not saved. They are not persistent!"
+  fi
 fi
 
 echo "Wireguard installed"
