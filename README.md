@@ -1,6 +1,10 @@
 ## About this
 
-This is wireguard script configuration for a intermediate public server two interconnect two sites.
+This is wireguard script configuration for a intermediate public server to interconnect two sites.
+
+LAN 1 --- LAN 1 Router ---- Server (in Internet, like VPS) ---- LAN 2 Router --- LAN 2
+
+So you can reach LAN 2 from LAN 1 and vice versa.
 
 ## Generate the configuration in your system
 
