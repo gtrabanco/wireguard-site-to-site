@@ -6,9 +6,9 @@
 
 # Usage examples:
 #
-#   1. Allow port 80 for VPN nodes
+#   1. Allow port 80 for a local network of LAN 1 192.168.0.0/24
 #     $ . .env
-#     $ ./fw-open.sh 80 10.1.1.0/24
+#     $ ./fw-open.sh 80 192.168.0.0/24
 #   2. Allow port 22 for just a VPN node with IP 10.1.1.3
 #     $ . .env
 #     $ ./fw-open.sh 22 10.1.1.3
@@ -20,9 +20,8 @@
 #     $ ./fw-open.sh --remove-duplicates
 #
 # IMPORTANT:
-# You can't disallow a port connection for all networks that are behind a node
-#  that must be done in the gateway. The server will see the peer ip and not
-#  the local ip. Keep this in mind when you use this script.
+# Local clients of each LAN will appear to VPN as their LAN IP. So you can
+# enable or disable services in server for use locally only.
 
 if [[ " $* " ==  *" --help "* ]]; then
   grep '^#' "$0" | cut -c3- | tail -n +2
