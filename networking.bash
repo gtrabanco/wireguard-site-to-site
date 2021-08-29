@@ -153,19 +153,15 @@ ipv4_bits() {
   echo "$total_bits"
 }
 
-validateIPCIDR() {
-  echo "$1" | grep -E -q "^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\/(3[0-2]|[0-2]?[0-9]{1})?)$"
-}
-
-validateCIDR() {
+validate_ip_cidr() {
   echo "$1" | grep -E -q "^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/(3[0-2]|[0-2]?[0-9]{1})$"
 }
 
-validateIP() {
+validate_ip() {
   echo "$1" | grep -E -q "^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
 }
 
-ipGetMask() {
+ip_get_mask() {
   local bits
   bits="$(echo "$1" | grep -E -o "(\/(3[0-2]|[0-2]?[0-9]{1})?)$" || echo "/-1")"
   bits="${bits:1}"
@@ -175,7 +171,7 @@ ipGetMask() {
   fi
 }
 
-startWG() {
+start_wireguard() {
   local -r interface="${3:-${VPN_SERVER_WG0:-wg0}}"
   local -r file="${2:-${VPN_SERVER_CONFIG_FILE:-/etc/wireguard/${interface}.conf}}"
   local -r server_ip="${1:-${VPN_SERVER_IP:-10.0.0.1}}"
@@ -183,10 +179,9 @@ startWG() {
   ip link add dev "$interface" type wireguard || echo "Wireguard interface already exists"
   ip address add dev "$interface" "${server_ip}/32" || echo "Interface address was not added"
   ip route add "${server_ip}/32" dev "${interface}" || echo "Route to ${server_ip} was not added"
-  # register_peers_routes
 }
 
-stopWG() {
+stop_wireguard() {
   local -r interface="${3:-${VPN_SERVER_WG0:-wg0}}"
   local -r file="${2:-${VPN_SERVER_CONFIG_FILE:-/etc/wireguard/${interface}.conf}}"
   local -r server_ip="${1:-${VPN_SERVER_IP:-10.0.0.1}}"
@@ -200,7 +195,7 @@ register_route() {
   local cidr
   local -r gateway="${1:-}"
 
-  if ! validateIP "$gateway"; then
+  if ! validate_ip "$gateway"; then
     echo "Needs a valid gateway" 1>&2
     return 1
   fi
@@ -221,26 +216,6 @@ register_route() {
   done
 }
 
-# Nees variables PEERS_IP & NETWORKS_CONFIG_${i}
-register_peers_routes() {
-  local i=0 array_name="" routes=()
-  for peer_ip in "${PEERS_IP[@]}"; do
-    if ! validateIP "$peer_ip"; then
-      echo "Peer IP '$peer_ip' is invalid ip address"
-    fi
-
-    array_name="NETWORKS_CONFIG_${i}"
-    
-    if [[ -n "${!array_name:-}" ]]; then
-      routes=($(eval "echo \${${array_name}[@]}"))
-      register_route "$peer_ip" "${routes[@]}"
-    fi
-    i=$(( i + 1 ))
-    routes=()
-    array_name=""
-  done
-}
-
 get_peer_index_networks() {
   local array_name="" routes=() IFS
 
@@ -248,7 +223,7 @@ get_peer_index_networks() {
   local -r peer_ip="${PEERS_IP[$i]:-}"
   [[ -z "$i" || -z "$peer_ip" ]] && return
 
-  if ! validateIP "$peer_ip"; then
+  if ! validate_ip "$peer_ip"; then
     echo "Peer IP '$peer_ip' is invalid ip address" 1>&2
     return
   fi
@@ -269,7 +244,7 @@ get_all_allowed_ips() {
   local i=0 array_name="" routes=() IFS=$' '
 
   for peer_ip in "${PEERS_IP[@]}"; do
-    if ! validateIP "$peer_ip"; then
+    if ! validate_ip "$peer_ip"; then
       echo "Peer IP '$peer_ip' is invalid ip address"
     fi
 
@@ -330,8 +305,8 @@ gen_interface_config() {
   [[ -z "$ip_address" ]] && echo "Needs an IP address" 1>&2 && return
   ! type wg &> /dev/null && echo "Is wireguard installed?" 1>&2 && return
 
-  if [[ -n "$(ipGetMask "$ip_address")" ]]; then
-    local -r bits="$(ipv4_bits "$(ipGetMask "$ip_address")" || echo -n)"
+  if [[ -n "$(ip_get_mask "$ip_address")" ]]; then
+    local -r bits="$(ipv4_bits "$(ip_get_mask "$ip_address")" || echo -n)"
   else
     local -r bits="$(ipv4_bits "${3:-0}" || echo -n)"
     shift

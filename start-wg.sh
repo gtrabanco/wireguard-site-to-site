@@ -22,7 +22,7 @@ if ! has_sudo; then
 fi
 
 # Start wireguard
-stopWG
+stop_wireguard
 sleep 1s
-startWG
+start_wireguard
 sleep 1s
