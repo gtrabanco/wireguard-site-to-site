@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+[[ $UID == 0 ]] || { echo "You must be root to run this."; exit 1; }
+
 # Usage examples:
 #
 #   1. Allow port 80 for VPN nodes
@@ -12,6 +14,8 @@
 #     $ ./fw-open.sh 53 udp
 #   4. Disallow port 22 for specific node
 #     $ ./fw-open.sh 22 10.1.1.5 DROP
+#   5. Remove duplicate rules
+#     $ ./fw-open.sh --remove-duplicates
 #
 # IMPORTANT:
 # You can't disallow a port connection for all networks that are behind a node
@@ -20,6 +24,11 @@
 
 if [[ " $* " ==  *" --help "* ]]; then
   grep '^#' "$0" | cut -c3- | tail -n +2
+  exit
+elif [[ " $* " ==  *" --remove-duplicates "* ]]; then
+  echo "Removing duplicate rules"
+  iptables_remove_duplicates
+  echo "Done"
   exit
 fi
 
@@ -74,4 +83,8 @@ get_rule() {
   echo "$rule"
 }
 
-get_rule "$@"
+rule=$(get_rule "$@")
+
+echo "Applying rule:"
+echo " > $rule"
+eval "command sudo ${rule}"
