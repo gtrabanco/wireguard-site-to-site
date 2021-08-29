@@ -2,6 +2,8 @@
 
 [[ $UID == 0 ]] || { echo "You must be root to run this."; exit 1; }
 
+. "$(dirname "$BASH_SOURCE")/networking.bash"
+
 # Usage examples:
 #
 #   1. Allow port 80 for VPN nodes
