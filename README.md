@@ -6,7 +6,11 @@
   - [macOS](#macos)
   - [Windows](#windows)
 - [Next step](#next-step)
+  - [Starting Wireguard](#starting-wireguard)
+  - [Configure terminals](#configure-terminals)
+  - [Configure gateways](#configure-gateways)
 - [Contributing](#contributing)
+- [Wireguard Help](#wireguard-help)
 
 ## About this
 
@@ -62,11 +66,45 @@ mv .env.dist .env
 
 ## Next step
 
-Install wireguard in the terminals (phone or computer) that would be also a peers (outside of the LANS) and use the configuration files.
+### Starting Wireguard
+
+If you have generated the configuration files in the final Wireguard Server you can set up Wireguard as a service by using:
+
+```bash
+./start_as_service.sh
+```
+
+If you want to test or you want to execute wireguard manually you can by using:
+
+```bash
+echo "Starting wireguard"
+./start-wg.sh
+```
+
+To stop:
+
+```bash
+echo "Stoping wireguard"
+./stop-wg.sh
+```
+
+### Configure terminals
+
+Install wireguard in the terminals (phone or computer) that would be also a peers (outside of the LANS) and use the configuration files for those peers.
+
+### Configure gateways
 
 In the LANs, install the wireguard or use wireguard-go dockerized using the configuration file.
 
+If you use Wg in your gateway it must know how to get any direct local network so you should be able to get those networks that router must know how to reach and route to other networks through the VPN networks. Any special routing configuration can be needed so you need some networking knowledge.
+
+Please do not use issues to ask about any other configuration that is not implicit with wireguard or any linux server configuration.
 
 ## Contributing
 
 PRs are accepted to improve the scripts, tools and documentation. Anyway, whatever contribution should keep the main target which is connect P2P two or more LANs.
+
+## Wireguard Help
+
+If you need some help with wireguard the [official webiste](https://www.wireguard.com/) ([witepapper](https://www.wireguard.com/papers/wireguard.pdf)) is very good reference but you can also access to sample wireguard configurations and documentation here:
+- https://github.com/pirate/wireguard-docs
