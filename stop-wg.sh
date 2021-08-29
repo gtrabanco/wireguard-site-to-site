@@ -15,4 +15,4 @@ if [[ ! -r "$VPN_SERVER_CONFIG_FILE" ]]; then
 fi
 
 # Start wireguard
-stopWG "${VPN_SERVER_IP:-10.0.0.1}" "${VPN_SERVER_CONFIG_FILE:-/etc/wireguard/${VPN_SERVER_WG0:-wg0}.conf}}" "${VPN_SERVER_WG0:-wg0}"
+stop_wireguard "${VPN_SERVER_IP:-10.0.0.1}" "${VPN_SERVER_CONFIG_FILE:-/etc/wireguard/${VPN_SERVER_WG0:-wg0}.conf}}" "${VPN_SERVER_WG0:-wg0}"
