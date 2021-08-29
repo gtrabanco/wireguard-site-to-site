@@ -119,7 +119,6 @@ for i in "${!PEERS_IP[@]}"; do
     echo
     echo "Generating peer config for '${peer_name}' in server config file"
 
-    ARRAY_NETWORKS_PEER_VAR_NAME="NETWORKS_CONFIG_${i}"
     REACHED_NETWORKS_PEER="$(get_peer_index_networks "$i")"
     if [[ -n "${REACHED_NETWORKS_PEER:-}" ]]; then
       REACHED_NETWORKS_PEER="${peer_ip}/32, ${REACHED_NETWORKS_PEER}"
