@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 #shellcheck disable=SC2206,SC2207,SC2016
 
+_w() {
+  echo "$*"
+}
+
 _log() {
   echo "$*" >&2
 }
@@ -8,6 +12,10 @@ _log() {
 _warn() {
   _log "$*"
   exit 4
+}
+
+_d() {
+  ${DEBUG:-false} && _log "$*"
 }
 
 start_sudo() {
