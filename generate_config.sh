@@ -42,7 +42,7 @@ if [[ $VPN_SERVER_PORT -gt 65535 || $VPN_SERVER_PORT -lt 1024 ]]; then
 fi
 
 if [[ -n "$(sudo lsof "-i:${VPN_SERVER_PORT}" 2> /dev/null)" ]]; then
-  echo "The por '${VPN_SERVER_PORT}' is still in use"
+  echo "The port '${VPN_SERVER_PORT}' is still in use"
   exit 4
 fi
 
