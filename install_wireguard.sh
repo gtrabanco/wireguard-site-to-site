@@ -20,7 +20,7 @@ fi
   -z "${VPN_SERVER_BITS_MASK:-}"
 ]] && echo "Empty ip or network mask" && exit 4
 
-VPN_NETWORK_CDR="${VPN_SERVER_IP}/${VPN_SERVER_BITS_MASK}"
+VPN_NETWORK_CIDR="${VPN_SERVER_IP}/${VPN_SERVER_BITS_MASK}"
 sysctl_modified=false
 
 start_sudo
@@ -75,7 +75,7 @@ if ! ${IGNORE_IPTABLES_CONFIG:-false}; then
   command sudo iptables -I INPUT -p tcp -m tcp --dport "${SSHD_SERVER_PORT:-22}" -j ACCEPT
   command sudo iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
   command sudo iptables -A FORWARD -i "${VPN_SERVER_WG0:-wg0}" -o "${VPN_SERVER_WG0:-wg0}" -m conntrack --ctstate NEW -j ACCEPT
-  command sudo iptables -t nat -A POSTROUTING -s "$VPN_NETWORK_CDR" -o "${VPN_SERVER_ETH:-eth0}" -j MASQUERADE
+  command sudo iptables -t nat -A POSTROUTING -s "$VPN_NETWORK_CIDR" -o "${VPN_SERVER_ETH:-eth0}" -j MASQUERADE
 
   # Remove duplicated iptables rules
   iptables_remove_duplicates
