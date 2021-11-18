@@ -42,7 +42,7 @@ _log () {
     printf "%s\n" "$@" | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}" &> /dev/null
   fi
 
-  _d "$@"
+  _debug "$@"
   
   if [[ ! -t 0 ]]; then
     printf "%s\n" "$(< /dev/stdin)" | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}"
@@ -61,7 +61,7 @@ _set() {
   local -r var_name="${1:-}"
   [[ -z "${var_name}" ]] && _warn "No variable name provided"
   shift
-  _d "Setting var '${var_name}' to the value(s) '$*'"
+  _debug "Setting var '${var_name}' to the value(s) '$*'"
   if [[ $# -gt 1 ]]; then
     eval "${var_name}=(${*})"
   else
@@ -77,7 +77,7 @@ _set_secret() {
   local -r var_name="${1:-}"
   [[ -z "${var_name}" ]] && _warn "No variable name provided"
   shift
-  _d "Setting var '${var_name}'"
+  _debug "Setting var '${var_name}'"
   if [[ $# -gt 1 ]]; then
     eval "${var_name}=(${*})"
   else
