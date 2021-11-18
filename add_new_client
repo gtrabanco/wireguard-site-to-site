@@ -3,7 +3,7 @@
 
 set -euo pipefail
 
-# [[ $UID == 0 ]] || { _w "You must be root to run this."; exit 1; }
+[[ $UID == 0 ]] || { _w "You must be root to run this."; exit 1; }
 
 . "$(dirname "$BASH_SOURCE")/networking.bash"
 . "$(dirname "$BASH_SOURCE")/.env.dist"
@@ -65,7 +65,7 @@ done
 
 if [[ -z "${peer_ip:-}" ]]; then
   _info "You must specify a peer IP or name."
-  "$0" --help
+  "$0" --help >&2
 
   exit 4
 fi
