@@ -9,6 +9,7 @@
   - [Starting Wireguard](#starting-wireguard)
   - [Configure terminals](#configure-terminals)
   - [Configure gateways](#configure-gateways)
+- [Adding new peers](#adding-new-peers)
 - [Contributing](#contributing)
 - [Wireguard Help](#wireguard-help)
 
@@ -99,6 +100,14 @@ In the LANs, install the wireguard or use wireguard-go dockerized using the conf
 If you use Wg in your gateway it must know how to get any direct local network so you should be able to get those networks that router must know how to reach and route to other networks through the VPN networks. Any special routing configuration can be needed so you need some networking knowledge.
 
 Please do not use issues to ask about any other configuration that is not implicit with wireguard or any linux server configuration.
+
+## Adding new peers
+
+After generating a configuration you can add a new peer by using `./add_new_peer` command.
+
+See usage with `./add_new_peer --help`.
+
+**IMPORTANT**: You need to know the ip you will give to the peer and configuration must be as when generated (minimum the public & private keys & configuration for server, normmally called `wg0`).
 
 ## Contributing
 
