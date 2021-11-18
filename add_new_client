@@ -117,7 +117,6 @@ _d "Default configuration for wg server"
 #VPN_NETWORK_CIDR="${VPN_SERVER_IP}/${VPN_SERVER_BITS_MASK}"
 _s VPN_SERVER_PORT "${VPN_SERVER_PORT:-51820}"
 _s SSHD_SERVER_PORT "${SSHD_SERVER_PORT:-22}"
-_s GENERATE_PEER_PSK !${disable_psk:-false}
 _s should_create_backup false
 
 _d "Creating & checking peers config path"
@@ -140,7 +139,7 @@ _ss SERVER_PRIVATE_KEY "$(cat "$VPN_SERVER_PRIVATE_KEY")"
 _ss SERVER_PUBLIC_KEY "$(cat "$VPN_SERVER_PUBLIC_KEY")"
 [[ -z "$SERVER_PRIVATE_KEY" || -z "$SERVER_PUBLIC_KEY" ]] && _warn "The server keys are not configured"
 
-_d "==== Staring the peer configuration ===="
+_d "==== Starting the peer configuration ===="
 # Generate the peer configuration
 _d "Init values"
 _s peer_config_file
