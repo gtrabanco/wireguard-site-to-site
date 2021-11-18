@@ -52,7 +52,7 @@ mv .env.dist .env
 3. Generate the config
 
 ```bash
-./generate_config.sh
+./generate_config
 ```
 
 ### Windows
