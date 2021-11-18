@@ -480,6 +480,16 @@ gen_peer_config() {
 }
 
 iptables_remove_duplicates() {
+  if
+    ! command -v service &>/dev/null ||
+    ! command -v iptables &>/dev/null ||
+    ! command -v iptables-save &>/dev/null ||
+    ! command -v iptables-restore &>/dev/null
+  then
+    _info "Any iptables command does not exist or could not be found" | _log
+    return
+  fi
+
   command service iptables save &> /dev/null || true
   command iptables-save | command awk '/^COMMIT$/ { delete x; }; !x[$0]++' | tee /tmp/iptables.conf &> /dev/null
   command iptables -F
@@ -509,6 +519,7 @@ qrencode_dependency_installed() {
     fi
   fi
 }
+
 
 show_file_as_qr() {
   [[ ! -r "${1:-}" ]] && return 1
