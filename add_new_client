@@ -3,10 +3,10 @@
 
 set -euo pipefail
 
-[[ $UID == 0 ]] || { _w "You must be root to run this."; exit 1; }
+. "$(dirname "$BASH_SOURCE")/networking.bash" || echo "Could not find the networking library" && exit 4
+. "$(dirname "$BASH_SOURCE")/.env.dist" || echo "Could not find the .env configuration file" && exit 4
 
-. "$(dirname "$BASH_SOURCE")/networking.bash"
-. "$(dirname "$BASH_SOURCE")/.env.dist"
+[[ $UID == 0 ]] || { _w "You must be root to run this."; exit 1; }
 
 # Options
 _d "Getting the options"
