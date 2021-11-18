@@ -5,17 +5,98 @@ _w() {
   echo "$*"
 }
 
-_log() {
-  echo "$*" >&2
+_info() {
+  _w "$*" >&2
+}
+
+_i() {
+  _info "$*"
 }
 
 _warn() {
-  _log "$*"
+  _info "WARNING: $*" | _log "== FATAL ERROR =="
+  _log "WARNING: $*"
   exit 4
 }
 
+_debug() {
+  [[ ${DEBUG:-false} == true || ${DEBUG:-0} -gt 0 ]] && _info "$*"
+}
+
 _d() {
-  ${DEBUG:-false} && _log "$*"
+  _debug "$*"
+}
+
+_log () {
+  if [[ $# -gt 0 ]]; then
+    printf "%s\n" "$@" | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}" &> /dev/null
+  fi
+
+  _d "$@"
+  
+  if [[ ! -t 0 ]]; then
+    printf "%s\n" "$(< /dev/stdin)" | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}"
+  fi
+
+  echo | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}" &> /dev/null
+}
+
+_log_exec() {
+  echo "$*" | _log "Executing command" &> /dev/null
+  "$@" 2>&1 | _log "Command output"
+  echo "End of command execution" | _log &> /dev/null
+}
+
+_set() {
+  local -r var_name="${1:-}"
+  [[ -z "${var_name}" ]] && _warn "No variable name provided"
+  shift
+  _d "Setting var '${var_name}' to the value(s) '$*'"
+  if [[ $# -gt 1 ]]; then
+    eval "${var_name}=(${*})"
+  else
+    eval "${var_name}=${1:-}"
+  fi
+}
+
+_s() {
+  _set "$@"
+}
+
+_set_secret() {
+  local -r var_name="${1:-}"
+  [[ -z "${var_name}" ]] && _warn "No variable name provided"
+  shift
+  _d "Setting var '${var_name}'"
+  if [[ $# -gt 1 ]]; then
+    eval "${var_name}=(${*})"
+  else
+    eval "${var_name}=${1:-}"
+  fi
+}
+
+_ss() {
+  _set_secret "$@"
+}
+
+_unset() {
+  [[ $# -eq 0 ]] && return
+  _d "Unsetting var(s) $(printf "%s " "$@")"
+  unset "$@"
+}
+
+_u() {
+  _unset "$@"
+}
+
+# Return true if it is: true, 1 yes, y, on or enable
+_check_true() {
+  [[ ${1:-} == true || ${1:-} == 1 || ${1:-} == yes || ${1:-} == y || ${1:-} == on || ${1:-} == enable ]]
+}
+
+# Return false if it is: false, 0 no, n, off or disable
+_check_false() {
+  ! [[ ${1:-} == false || ${1:-} == 0 || ${1:-} == no || ${1:-} == n || ${1:-} == off || ${1:-} == disable ]]
 }
 
 start_sudo() {
@@ -440,22 +521,4 @@ generate_qr_code_from_file() {
   ! qrencode_dependency_installed && return 1
 
   qrencode -m 2 -t ansiutf8 -o "${2:-}" <<< "$1"
-}
-
-_log () {
-  if [[ $# -gt 0 ]]; then
-    printf "%s\n" "$@" | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}" &> /dev/null
-  fi
-  
-  if [[ ! -t 0 ]]; then
-    printf "%s\n" "$(< /dev/stdin)" | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}"
-  fi
-
-  echo | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}" &> /dev/null
-}
-
-_log_exec() {
-  echo "$*" | _log "Executing command" &> /dev/null
-  "$@" 2>&1 | _log "Command output"
-  echo "End of command execution" | _log &> /dev/null
 }
