@@ -146,7 +146,6 @@ _s peer_config_file
 _s peer_private_key
 _s peer_public_key
 _s peer_psk
-_s peer_name "${peer_name:-$peer_ip}"
 _s peer_config_file "${INTERFACE_PEERS_CONFIG_PATH}/${peer_ip}"
 
 # Gerating keys

@@ -65,7 +65,7 @@ _set() {
   if [[ $# -gt 1 ]]; then
     eval "${var_name}=(${*})"
   else
-    eval "${var_name}=${1:-\"\"}"
+    eval "${var_name}=\"${1:-\"\"}\""
   fi
 }
 
