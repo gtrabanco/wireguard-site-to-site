@@ -1,0 +1,212 @@
+#!/usr/bin/env bash
+#shellcheck disable=SC1091,SC2128,SC2154,SC2086,SC2034
+
+set -euo pipefail
+
+# [[ $UID == 0 ]] || { _w "You must be root to run this."; exit 1; }
+
+. "$(dirname "$BASH_SOURCE")/networking.bash"
+. "$(dirname "$BASH_SOURCE")/.env.dist"
+
+# Options
+_d "Getting the options"
+while [[ $# -gt 0 ]]; do
+  _s peer_ip ""
+  _s peer_name
+  _s GENERATE_PEER_PSK true
+  _s is_behind_nat true
+  _s peer_local_networks
+  _s DEBUG false
+  case $1 in
+    -h|--help)
+      _w
+      _w "Usage:"
+      _w "  $0 [-h|--help] [-v|--version]"
+      _w "  $0 (-i|--peer-ip <peer_ip>) [-n|--name <peer_name>] [--peer-local-networks <comma_separated_string_networks_cidr>] [-d|--disable-psk] [-b|--not-behind-nat] [-d|--debug|--verbose]"
+      _w
+      "$0" --version
+      exit
+      ;;
+    -v|--version)
+      _w "$0 v1.0.0"
+      exit
+      ;;
+    -i|--peer-ip)
+      _s peer_ip "$2"
+      shift 2
+      ;;
+    --peer-local-networks)
+      _s peer_local_networks "$2"
+      shift 2
+      ;;
+    -n|--name)
+      _s peer_name "$2"
+      shift 2
+      ;;
+    -p|--disable-psk)
+      _s GENERATE_PEER_PSK false
+      shift
+      ;;
+    -b|--not-behind-nat)
+      _s is_behind_nat false
+      shift
+      ;;
+    -d|--debug|--verbose)
+      _s DEBUG true
+      shift
+      ;;
+    *)
+      _w "Unknown option: $1" >&2
+      $0 --help
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "${peer_ip:-}" ]]; then
+  _info "You must specify a peer IP or name."
+  "$0" --help
+
+  exit 4
+fi
+
+# Configuration checks
+_d "Checking VPN Configuration"
+[[
+  -z "${VPN_SERVER_IP:-}" ||
+  -z "${VPN_SERVER_BITS_MASK:-}" ||
+  -z "${VPN_SERVER_PRIVATE_KEY:-}" ||
+  -z "${VPN_SERVER_PUBLIC_KEY:-}" ||
+  -z "${VPN_SERVER_CONFIG_FILE:-}" ||
+  -z "${INTERFACE_PEERS_CONFIG_PATH:-}" ||
+  -z "${INTERFACE_STORE_KEYS_PATH:-}"
+]] && _warn "Any needed variable is not configured"
+
+_d "Checking if private & public keys for server are accesible"
+[[
+  ! -f "$VPN_SERVER_PUBLIC_KEY" ||
+  ! -f "$VPN_SERVER_PRIVATE_KEY" ||
+  ! -f "$VPN_SERVER_CONFIG_FILE"
+]] && _warn "Could not found previous configuration for wireguard, generate it first or change your configuration values"
+
+_d "Default configuration for wg server"
+#VPN_NETWORK_CIDR="${VPN_SERVER_IP}/${VPN_SERVER_BITS_MASK}"
+_s VPN_SERVER_PORT "${VPN_SERVER_PORT:-51820}"
+_s SSHD_SERVER_PORT "${SSHD_SERVER_PORT:-22}"
+_s GENERATE_PEER_PSK !${disable_psk:-false}
+_s should_create_backup false
+
+_d "Creating & checking peers config path"
+mkdir -p "$INTERFACE_PEERS_CONFIG_PATH" || true
+[[ ! -w "$INTERFACE_PEERS_CONFIG_PATH" ]] && _warn "Failed to create the directory to store the peers configuration or is not writable"
+
+_d "Creating & checking store keys path"
+mkdir -p "$INTERFACE_STORE_KEYS_PATH" || true
+[[ ! -w "$INTERFACE_STORE_KEYS_PATH" ]] && _warn "Failed to create the directory to store the keys or is not writable"
+
+_d "Checking wg port"
+[[ $VPN_SERVER_PORT -gt 65535 || $VPN_SERVER_PORT -lt 1024 ]] && _warn "You should choose a port between 1024 & 65535"
+
+_d "Starting & checking sudo"
+start_sudo
+! has_sudo && _warn "sudo is necessary"
+
+_d "Fetching server private & public keys"
+_ss SERVER_PRIVATE_KEY "$(cat "$VPN_SERVER_PRIVATE_KEY")"
+_ss SERVER_PUBLIC_KEY "$(cat "$VPN_SERVER_PUBLIC_KEY")"
+[[ -z "$SERVER_PRIVATE_KEY" || -z "$SERVER_PUBLIC_KEY" ]] && _warn "The server keys are not configured"
+
+_d "==== Staring the peer configuration ===="
+# Generate the peer configuration
+_d "Init values"
+_s peer_config_file
+_s peer_private_key
+_s peer_public_key
+_s peer_psk
+_s peer_name "${peer_name:-$peer_ip}"
+_s peer_config_file "${INTERFACE_PEERS_CONFIG_PATH}/${peer_ip}"
+
+# Gerating keys
+_d "Setting where to store the keys"
+_s peer_private_key_file "${INTERFACE_STORE_KEYS_PATH}/${peer_ip}"
+_s peer_public_key_file "${INTERFACE_STORE_KEYS_PATH}/${peer_ip}.pub"
+
+_d "Cheking if it is necessary to generate the peer keys"
+if [[ ! -r "$peer_private_key_file" || ! -r "$peer_public_key_file" ]]; then
+  _d "Generating peer '${peer_ip}' keys"
+  should_create_backup=true
+  rm -rf "$peer_private_key_file" "$peer_public_key_file"
+  _w "Generating keys for peer: '${peer_name}'"
+  gen_pair_of_keys "$peer_private_key_file" "$peer_public_key_file" | _log "Generating peer pair of keys"
+  if [[ ! -r "$peer_private_key_file" || ! -r "$peer_public_key_file" ]]; then
+    _warn "Failed to generate keys for peer: '${peer_name}'"
+  fi
+fi
+
+_ss peer_private_key "$(cat "$peer_private_key_file")"
+_ss peer_public_key "$(cat "$peer_public_key_file")"
+
+# Generate peer configuration to save in server config
+_d "Generating peer configuration"
+_d "Checking if current public key for the peer is in the server configuration"
+if ! grep -q "^PublicKey = ${peer_public_key}" "$VPN_SERVER_CONFIG_FILE"; then
+  _d "Current peer IS NOT on the server configuration (normally wg0.conf)"
+  _s should_create_backup true
+
+  if _check_true "${GENERATE_PEER_PSK:-true}"; then
+    _d "Generating peer PSK"
+    _ss peer_psk "$(wg genpsk)"
+  fi
+
+  _w
+  _w "Generating peer config for '${peer_name}' in server config file"
+
+  _s REACHED_NETWORKS_PEER
+  if [[ -n "${peer_local_networks:-}" ]]; then
+    _s REACHED_NETWORKS_PEER "${peer_ip}/32, ${peer_local_networks}"
+  else
+    _s REACHED_NETWORKS_PEER "${peer_ip}/32"
+    _s is_behind_nat true
+    _d "No other networks found for '${peer_name}', this will setup as behind nat"
+  fi
+
+  # Add peer to server config is a one step process
+  {
+    # Should add in peer_ip a comma separated list of all reachable networks
+    gen_peer_config "${peer_name}" "" "$peer_public_key" "${REACHED_NETWORKS_PEER}" false "${peer_psk:-}" | tee -a "$VPN_SERVER_CONFIG_FILE"
+  } | _log "Generated peer config for '${peer_name}'" &> /dev/null
+
+else
+  _d "It IS on the server file configuration (normaly wg0.conf)"
+  _w "Peer '${peer_name}' already exists in server config"
+  _w "If configuration is created Pre Shared Key should be added later manually (you can get it from server configuration \"wg0.conf\")"
+fi
+
+# Check if peer config already exists
+_d "Checking if peer config already exists with the current Private & Public keys"
+if
+  [[ ! -f "$peer_config_file" ]] ||
+  ! grep -q "^PrivateKey = ${peer_private_key}" "$peer_config_file" ||
+  ! grep -q "^PublicKey = ${SERVER_PUBLIC_KEY}" "$peer_config_file"
+then
+  _d "Peer private or publick key did not found so we will add the client to the server configuration"
+  # Generate interface config for peer
+  should_create_backup=true
+  _w "[PEER] Step 1/2: Generating interface config for peer '${peer_name}'"
+  {
+    gen_interface_config "${peer_name}" "${peer_ip}" "${VPN_SERVER_BITS_MASK}" "" "$peer_private_key" "${PEER_DNS_SERVERS:-1.1.1.1}" false | tee "$peer_config_file"
+  } | _log "Generated interface config for peer '${peer_name}'" &> /dev/null
+
+    # Generate peer config for peer
+  _w "[PEER] Step 2/2: Generating peer config for peer '${peer_name}'"
+  {
+    gen_peer_config "Link '${peer_name}' to '${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}'" "${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}" "$SERVER_PUBLIC_KEY" "$PEER_ROUTES" "${is_behind_nat:-false}" "${peer_psk:-}" | tee -a "$peer_config_file"
+  } | _log "Generated peer config for peer '${peer_name}'" &> /dev/null
+  _w
+else
+  _w "Peer '${peer_name}' config already exists in the server config"
+  _w "Skipping"
+fi
+
+# End of Generate the peer config
+_d "==== End of peer configuration ===="
