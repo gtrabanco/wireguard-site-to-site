@@ -139,8 +139,8 @@ for i in "${!PEERS_IP[@]}"; do
   # Check if peer config already exists
   if
     [[ ! -f "$peer_config_file" ]] ||
-    ! grep -q "^PrivateKey = ${peer_private_key}" ||
-    ! grep -q "^PublicKey = ${SERVER_PUBLIC_KEY}"
+    ! grep -q "^PrivateKey = ${peer_private_key}" "$peer_config_file" ||
+    ! grep -q "^PublicKey = ${SERVER_PUBLIC_KEY}" "$peer_config_file"
   then
     # Generate interface config for peer
     should_create_backup=true
