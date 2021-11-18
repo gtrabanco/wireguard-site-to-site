@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 #shellcheck disable=SC2206,SC2207,SC2016
 
+# Return true if it is: true, 1 yes, y, on or enable
+_check_true() {
+  [[ ${1:-} == true || ${1:-} == 1 || ${1:-} == yes || ${1:-} == y || ${1:-} == on || ${1:-} == enable ]]
+}
+
+# Return false if it is: false, 0 no, n, off or disable
+_check_false() {
+  ! [[ ${1:-} == false || ${1:-} == 0 || ${1:-} == no || ${1:-} == n || ${1:-} == off || ${1:-} == disable ]]
+}
+
 _w() {
   echo "$*"
 }
@@ -20,7 +30,7 @@ _warn() {
 }
 
 _debug() {
-  [[ ${DEBUG:-false} == true || ${DEBUG:-0} -gt 0 ]] && _info "$*"
+  _check_true "${DEBUG:-false}" && _info "$*"
 }
 
 _d() {
@@ -87,16 +97,6 @@ _unset() {
 
 _u() {
   _unset "$@"
-}
-
-# Return true if it is: true, 1 yes, y, on or enable
-_check_true() {
-  [[ ${1:-} == true || ${1:-} == 1 || ${1:-} == yes || ${1:-} == y || ${1:-} == on || ${1:-} == enable ]]
-}
-
-# Return false if it is: false, 0 no, n, off or disable
-_check_false() {
-  ! [[ ${1:-} == false || ${1:-} == 0 || ${1:-} == no || ${1:-} == n || ${1:-} == off || ${1:-} == disable ]]
 }
 
 start_sudo() {
