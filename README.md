@@ -37,7 +37,7 @@ Install wireguard-tools to generate the configuration.
 3. Generate the config
 
 ```bash
-./generate_config.sh
+./generate_wg_config
 ```
 
 ### macOS
@@ -58,7 +58,7 @@ mv .env.dist .env
 3. Generate the config
 
 ```bash
-./generate_config
+./generate_wg_config
 ```
 
 ### Windows
@@ -73,21 +73,21 @@ mv .env.dist .env
 If you have generated the configuration files in the final Wireguard Server you can set up Wireguard as a service by using:
 
 ```bash
-./start_as_service.sh
+./start_wg_as_service
 ```
 
 If you want to test or you want to execute wireguard manually you can by using:
 
 ```bash
 echo "Starting wireguard"
-./start-wg.sh
+./start_wg
 ```
 
 To stop:
 
 ```bash
 echo "Stoping wireguard"
-./stop-wg.sh
+./stop_wg
 ```
 
 ### Configure terminals
