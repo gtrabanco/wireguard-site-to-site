@@ -10,6 +10,7 @@
   - [Configure terminals](#configure-terminals)
   - [Configure gateways](#configure-gateways)
 - [Adding new peers](#adding-new-peers)
+- [Using as binaries](#using-as-binaries)
 - [Contributing](#contributing)
 - [Wireguard Help](#wireguard-help)
 
@@ -108,6 +109,17 @@ After generating a configuration you can add a new peer by using `./add_new_peer
 See usage with `./add_new_peer --help`.
 
 **IMPORTANT**: You need to know the ip you will give to the peer and configuration must be as when generated (minimum the public & private keys & configuration for server, normmally called `wg0`).
+
+## Using as binaries
+
+You can use these scripts by adding them to `PATH` in your `.bashrc` (or equivalent file), execute in the path of these files locally:
+
+```bash
+echo "PATH=\"\${PATH+:\$PATH:$PWD}\"\n" | tee -a ~/.bashrc &>/dev/null
+. ~/.bashrc
+{ grep -q "$PWD" ~/.bashrc && command -v add_new_peer && echo "Now you can execute wireguard-site-to-site scripts"; } || echo "[FAIL] wireguard-site-to-site PATH could not be found"
+
+```
 
 ## Contributing
 
