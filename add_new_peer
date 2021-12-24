@@ -25,7 +25,9 @@ if [[ -z "$env_file" ]]; then
   exit 4
 fi
 
+. "$(dirname "$BASH_SOURCE")/core.bash"
 . "$(dirname "$BASH_SOURCE")/networking.bash"
+. "$(dirname "$BASH_SOURCE")/wireguard.bash"
 . "$env_file"
 
 [[ $UID == 0 ]] || { echo "You must be root to run this."; exit 1; }
