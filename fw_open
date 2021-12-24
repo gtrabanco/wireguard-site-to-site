@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
+#shellcheck disable=SC2206,SC2207,SC1091,SC2034,SC2128
 
 [[ $UID == 0 ]] || { echo "You must be root to run this."; exit 1; }
-
-. "$(dirname "$BASH_SOURCE")/networking.bash"
 
 # Usage examples:
 #
@@ -33,6 +32,7 @@ elif [[ " $* " ==  *" --remove-duplicates "* ]]; then
   exit
 fi
 
+. "$(dirname "$BASH_SOURCE")/core.bash"
 . "$(dirname "$BASH_SOURCE")/networking.bash"
 
 get_rule() {

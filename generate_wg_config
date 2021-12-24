@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #shellcheck disable=SC2206,SC2207,SC1091,SC2034,SC2128
 
-set -euo pipefail
-
 [[ $UID == 0 ]] || { echo "You must be root to run this."; exit 1; }
 
+. "$(dirname "$BASH_SOURCE")/core.bash"
 . "$(dirname "$BASH_SOURCE")/networking.bash"
+. "$(dirname "$BASH_SOURCE")/wireguard.bash"
 . "$(dirname "$BASH_SOURCE")/.env"
 
 [[
@@ -18,7 +18,7 @@ set -euo pipefail
   -z "${INTERFACE_STORE_KEYS_PATH:-}"
 ]] && echo "Any needed variable is not configured" && exit 4
 
-#VPN_NETWORK_CIDR="${VPN_SERVER_IP}/${VPN_SERVER_BITS_MASK}"
+VPN_NETWORK_CIDR="${VPN_NETWORK_CIDR:-$(get_network_cidr "${VPN_SERVER_IP}/${VPN_SERVER_BITS_MASK}")}"
 VPN_SERVER_PORT=${VPN_SERVER_PORT:-51820}
 SSHD_SERVER_PORT=${SSHD_SERVER_PORT:-22}
 GENERATE_PEER_PSK=${GENERATE_PEER_PSK:-true}
@@ -34,6 +34,11 @@ mkdir -p "$INTERFACE_STORE_KEYS_PATH" || true
 if [[ ! -w "$INTERFACE_STORE_KEYS_PATH" ]]; then
   echo "Failed to create the directory to store the keys or is not writable"
   exit 5
+fi
+
+if [[ -n "$VPN_NETWORK_CIDR" ]]; then
+  echo "Can not determine the VPN network CIDR"
+  exit 4
 fi
 
 if [[ $VPN_SERVER_PORT -gt 65535 || $VPN_SERVER_PORT -lt 1024 ]]; then
@@ -121,7 +126,7 @@ for i in "${!PEERS_IP[@]}"; do
 
     REACHED_NETWORKS_PEER="$(get_peer_index_networks "$i")"
     if [[ -n "${REACHED_NETWORKS_PEER:-}" ]]; then
-      REACHED_NETWORKS_PEER="${peer_ip}/32, ${REACHED_NETWORKS_PEER}"
+      REACHED_NETWORKS_PEER="${peer_ip}/32, ${VPN_NETWORK_CIDR}, ${REACHED_NETWORKS_PEER}"
     else
       REACHED_NETWORKS_PEER="${peer_ip}/32"
       is_behind_nat=true

@@ -1,128 +1,6 @@
 #!/usr/bin/env bash
 #shellcheck disable=SC2206,SC2207,SC2016
 
-# Return true if it is: true, 1 yes, y, on or enable
-_check_true() {
-  [[ ${1:-} == true || ${1:-} == 1 || ${1:-} == yes || ${1:-} == y || ${1:-} == on || ${1:-} == enable ]]
-}
-
-# Return false if it is: false, 0 no, n, off or disable
-_check_false() {
-  ! [[ ${1:-} == false || ${1:-} == 0 || ${1:-} == no || ${1:-} == n || ${1:-} == off || ${1:-} == disable ]]
-}
-
-_w() {
-  echo "$*"
-}
-
-_info() {
-  _w "$*" >&2
-}
-
-_i() {
-  _info "$*"
-}
-
-_warn() {
-  _info "WARNING: $*" | _log "== FATAL ERROR =="
-  _log "WARNING: $*"
-  exit 4
-}
-
-_debug() {
-  _check_true "${DEBUG:-false}" && _info "$*"
-}
-
-_d() {
-  _debug "$*"
-}
-
-_log () {
-  if [[ $# -gt 0 ]]; then
-    printf "%s\n" "$@" | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}" &> /dev/null
-  fi
-
-  _debug "$@"
-  
-  if [[ ! -t 0 ]]; then
-    printf "%s\n" "$(< /dev/stdin)" | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}"
-  fi
-
-  echo | tee -a "${LOG_FILE:-${HOME}/wireguard-setup.log}" &> /dev/null
-}
-
-_log_exec() {
-  echo "$*" | _log "Executing command" &> /dev/null
-  "$@" 2>&1 | _log "Command output"
-  echo "End of command execution" | _log &> /dev/null
-}
-
-_set() {
-  local -r var_name="${1:-}"
-  [[ -z "${var_name}" ]] && _warn "No variable name provided"
-  shift
-  _debug "Setting var '${var_name}' to the value(s) '$*'"
-  if [[ $# -gt 1 ]]; then
-    eval "${var_name}=(${*})"
-  else
-    eval "${var_name}=\"${1:-\"\"}\""
-  fi
-}
-
-_s() {
-  _set "$@"
-}
-
-_set_secret() {
-  local -r var_name="${1:-}"
-  [[ -z "${var_name}" ]] && _warn "No variable name provided"
-  shift
-  _debug "Setting var '${var_name}'"
-  if [[ $# -gt 1 ]]; then
-    eval "${var_name}=(${*})"
-  else
-    eval "${var_name}=${1:-}"
-  fi
-}
-
-_ss() {
-  _set_secret "$@"
-}
-
-_unset() {
-  [[ $# -eq 0 ]] && return
-  _d "Unsetting var(s) $(printf "%s " "$@")"
-  unset "$@"
-}
-
-_u() {
-  _unset "$@"
-}
-
-start_sudo() {
-  if ! has_sudo; then
-    command sudo -v -B
-    if has_sudo && [[ -z "${SUDO_PID:-}" ]]; then
-      (while true; do
-        command sudo -v
-        command sleep 30
-      done) &
-      SUDO_PID="$!"
-      builtin trap stop_sudo SIGINT SIGTERM
-    fi
-  fi
-}
-
-stop_sudo() {
-  builtin kill "$SUDO_PID" &> /dev/null
-  builtin trap - SIGINT SIGTERM
-  command sudo -k
-}
-
-has_sudo() {
-  command sudo -n -v &> /dev/null
-}
-
 ipv4_netmask() {
   local IFS='.' netmask=() rest_bits tmp_netmask=0
   local -r bits="${1:-0}"
@@ -311,174 +189,6 @@ register_route() {
   done
 }
 
-get_peer_index_networks() {
-  local array_name="" routes=() IFS
-
-  local -r i="${1:-}"
-  local -r peer_ip="${PEERS_IP[$i]:-}"
-  [[ -z "$i" || -z "$peer_ip" ]] && return
-
-  if ! validate_ip "$peer_ip"; then
-    echo "Peer IP '$peer_ip' is invalid ip address" 1>&2
-    return
-  fi
-
-  array_name="NETWORKS_CONFIG_${i}"
-  
-  if [[ -n "${!array_name:-}" ]]; then
-    routes=($(eval "echo \${${array_name}[@]}"))
-  fi
-
-  if [[ ${#routes[@]} -gt 0 ]]; then
-    IFS=','
-    echo "${routes[*]}"
-  fi
-}
-
-get_all_allowed_ips() {
-  local i=0 array_name="" routes=() IFS=$' '
-
-  for peer_ip in "${PEERS_IP[@]}"; do
-    if ! validate_ip "$peer_ip"; then
-      echo "Peer IP '$peer_ip' is invalid ip address"
-    fi
-
-    array_name="NETWORKS_CONFIG_${i}"
-
-    if [[ -n "${!array_name:-}" ]]; then
-      routes+=($(eval "echo \${${array_name}[*]}"))
-    fi
-    i=$(( i + 1 ))
-    array_name=""
-  done
-
-  if ${ROUTE_ALL_PRIVATE:-false}; then
-    echo "192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8"
-  elif [[ ${#routes[@]} -gt 0 ]]; then
-    IFS=','
-    echo "${routes[*]}"
-  else
-    echo "0.0.0.0/0, ::/0"
-  fi
-}
-
-gen_pair_of_keys() {
-  local -r private_key_file_path="${1:-}"
-  local public_key_file_path="${2:-${private_key_file_path}.pub}"
-
-  if
-    [[
-      -z "$private_key_file_path" ||
-      -r "$private_key_file_path" ||
-      -r "$public_key_file_path"
-    ]]
-  then
-    echo "Empty private/public key file path or private or public key file already exists" 1>&2
-    return 1
-  fi
-
-  umask 077
-  wg genkey | tee "$private_key_file_path" | wg pubkey | tee "$public_key_file_path" &> /dev/null
-  umask 022
-}
-
-#"
-# gen_interface_config()
-# Generate a config for wg Interface
-# @param string name
-# @param string ip_address
-# @param string netmask (bits) This param can be ignored if it is included with the ip address
-# @param string server_port
-# @param string key If none it will be generated
-# @param string dns_servers If none won't add it
-# @param boolean post_exec
-#;
-gen_interface_config() {
-  local -r name="${1:-}"
-  local -r ip_address="${2:-}"
-
-  [[ -z "$ip_address" ]] && echo "Needs an IP address" 1>&2 && return
-  ! type wg &> /dev/null && echo "Is wireguard installed?" 1>&2 && return
-
-  if [[ -n "$(ip_get_mask "$ip_address")" ]]; then
-    local -r bits="$(ipv4_bits "$(ip_get_mask "$ip_address")" || echo -n)"
-  else
-    local -r bits="$(ipv4_bits "${3:-0}" || echo -n)"
-    shift
-  fi
-  # Validate bits
-  [[ $bits -lt 0 || $bits -gt 32 ]] && echo "Wrong netmask bits" 1>&2 && return
-
-  local -r server_port="${3:-}"
-  # Validate server_port
-
-  local -r key="${4:-}"
-  local -r dns_servers="${5:-}"
-  local -r post_exec=${6:-false}
-
-  echo '[Interface]'
-  echo "# Name = ${name}"
-  echo "Address = ${ip_address}/${bits}"
-
-  if [[ -n "$server_port" ]]; then
-    echo "ListenPort = ${server_port}"
-  fi
-
-  echo "PrivateKey = ${key}"
-  
-  if [[ -n "${dns_servers:-}" ]]; then
-    echo "DNS = $dns_servers"
-  fi
-
-  if [[ "${post_exec:-true}" == "true" || "${post_exec:-}" == "1" ]]; then
-    [[ -n "${VPN_SERVER_IP}" && "${VPN_SERVER_IP}" != "$ip_address" ]] && echo "PostUp = ping -c1 ${VPN_SERVER_IP}"
-    echo 'PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE'
-    echo 'PostUp = echo "$(date +%s) WireGuard Started" >> /var/log/wireguard.log'
-    echo 'PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE'
-    echo 'PostDown = echo "$(date +%s) WireGuard Going Down" >> /var/log/wireguard.log'
-  fi
-  echo
-}
-
-#"
-# gen_peer_config()
-# Generate a config for wg Interface
-# @param string name
-# @param string server_address
-# @param string key
-# @param string allowed_ips
-# @param string is_nat
-# @param string pre_shared_key
-#;
-gen_peer_config() {
-  local -r name="${1:-}"
-  local -r server_address="${2:-}"
-  local -r key="${3:-}"
-  local -r allowed_ips="${4:-0.0.0.0/0, ::/0}"
-  local -r is_nat=${5:-false}
-  local -r pre_shared_key="${6:-}"
-
-  echo '[Peer]'
-  echo "# Name = ${name}"
-  
-  if [[ -n "$server_address" ]]; then
-    echo "Endpoint = ${server_address}"
-  fi
-
-  echo "PublicKey = ${key}"
-  
-  if [[ -n "$pre_shared_key" ]]; then
-    echo "PresharedKey = ${pre_shared_key}"
-  fi
-
-  if [[ "${is_nat:-true}" == "true" || "${is_nat:-}" == "1" ]]; then
-    echo 'PersistentKeepalive = 25'
-  fi
-
-  echo "AllowedIPs = ${allowed_ips}"
-  echo
-}
-
 iptables_remove_duplicates() {
   if
     ! command -v service &>/dev/null ||
@@ -502,34 +212,38 @@ iptables_remove_duplicates() {
   fi
 }
 
-qrencode_dependency_installed() {
-  if
-    ! command -v qrencode &> /dev/null &&
-    command -v apt &> /dev/null &&
-    ! dpkg --list "wireguard" &> /dev/null
-  then
-    echo "Installing qrencode dependency"
-    command sudo apt-get install -y qrencode &> /dev/null
-    if
-      command -v apt &> /dev/null &&
-      ! dpkg --list "wireguard" &> /dev/null
-    then
-      echo "Failed to install qrencode dependency" 1>&2
-      return 1
-    fi
+get_network_cidr() {
+  local octects final_ip=()
+  if validate_ipv4_cidr "${1:-}"; then
+    local -r ip="$(echo "${1:-}" | awk -F '/' '{print $1}')"
+    local -r netmask="$(echo "${1:-}" | awk -F '/' '{print $2}')"
+    [ "$netmask" -ge 0 ] && [ "$netmask" -le 32 ] || return
+  elif validate_ipv4 "${1:-}" && [[ ${2:-} -ge 0 && ${2:-} -le 32 ]]; then
+    local -r ip="${1:-}"
+    local -r netmask="${2:-}"
+  else
+    #echo "Needs a valid IPv4 address and netmask" 1>&2
+    return
   fi
-}
 
+  octects=($(echo "$ip" | tr '.' '\n'))
 
-show_file_as_qr() {
-  [[ ! -r "${1:-}" ]] && return 1
-  ! qrencode_dependency_installed && return 1
-  qrencode -m 2 -t ansiutf8 <<< "$1"
-}
+  local -r full_octects=$(( netmask / 8))
+  local -r reminder_bits=$(( netmask % 8 ))
+  local -r last_octect="${octects[$(( full_octects + 1))]}"
+  local -r net_octect="$(( reminder_bits > 0 ? (last_octect / ( 2 ** ( 8 - reminder_bits ))) * (2 ** ( 8 - reminder_bits )) : 0 ))"
 
-generate_qr_code_from_file() {
-  [[ ! -r "${1:-}" || -z "${2:-}" ]] && return 1
-  ! qrencode_dependency_installed && return 1
+  local IFS='.'
 
-  qrencode -m 2 -t ansiutf8 -o "${2:-}" <<< "$1"
+  while [ ${#final_ip[@]} -le $full_octects ]; do
+    final_ip+=("${octects[${#final_ip[@]}]}")
+  done
+
+  final_ip+=($net_octect)
+
+  while [[ ${#final_ip[@]} -lt 4 ]]; do
+    final_ip+=(0)
+  done
+
+  echo "${final_ip[*]:1}/${netmask}"
 }
