@@ -20,7 +20,7 @@ get_peer_index_networks() {
   fi
 
   if [[ ${#routes[@]} -gt 0 ]]; then
-    IFS=','
+    IFS=', '
     echo "${routes[*]}"
   fi
 }
@@ -45,7 +45,7 @@ get_all_allowed_ips() {
   if ${ROUTE_ALL_PRIVATE:-false}; then
     echo "192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8"
   elif [[ ${#routes[@]} -gt 0 ]]; then
-    IFS=','
+    IFS=', '
     echo "${routes[*]}"
   else
     echo "0.0.0.0/0, ::/0"
