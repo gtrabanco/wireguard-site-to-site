@@ -108,8 +108,6 @@ ipv4_bits() {
   echo "$total_bits"
 }
 
-
-
 validate_ipv4_cidr() {
   [[ ${1:-} =~ ^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/(3[0-2]|[0-2]?[0-9]{1})$ ]]
 }
@@ -142,6 +140,42 @@ ip_get_mask() {
   if [[ $bits -ge 0 && $bits -le 128 ]]; then
     echo "$bits"
   fi
+}
+
+get_network_cidr() {
+  local octects final_ip=()
+  if validate_ipv4_cidr "${1:-}"; then
+    local -r ip="$(echo "${1:-}" | awk -F '/' '{print $1}')"
+    local -r netmask="$(echo "${1:-}" | awk -F '/' '{print $2}')"
+    [ "$netmask" -ge 0 ] && [ "$netmask" -le 32 ] || return
+  elif validate_ipv4 "${1:-}" && [[ ${2:-} -ge 0 && ${2:-} -le 32 ]]; then
+    local -r ip="${1:-}"
+    local -r netmask="${2:-}"
+  else
+    #echo "Needs a valid IPv4 address and netmask" 1>&2
+    return
+  fi
+
+  octects=($(echo "$ip" | tr '.' '\n'))
+
+  local -r full_octects=$(( netmask / 8))
+  local -r reminder_bits=$(( netmask % 8 ))
+  local -r last_octect="${octects[$(( full_octects + 1))]}"
+  local -r net_octect="$(( reminder_bits > 0 ? (last_octect / ( 2 ** ( 8 - reminder_bits ))) * (2 ** ( 8 - reminder_bits )) : 0 ))"
+
+  local IFS='.'
+
+  while [ ${#final_ip[@]} -lt $full_octects ]; do
+    final_ip+=("${octects[${#final_ip[@]}]}")
+  done
+
+  final_ip+=($net_octect)
+
+  while [[ ${#final_ip[@]} -lt 4 ]]; do
+    final_ip+=(0)
+  done
+
+  echo "${final_ip[*]}/${netmask}" | awk '{sub(/^\./,"", $0); print $0}'
 }
 
 start_wireguard() {
@@ -210,40 +244,4 @@ iptables_remove_duplicates() {
   if [[ -f /tmp/iptables.conf ]]; then
     command rm -f /tmp/iptables.conf
   fi
-}
-
-get_network_cidr() {
-  local octects final_ip=()
-  if validate_ipv4_cidr "${1:-}"; then
-    local -r ip="$(echo "${1:-}" | awk -F '/' '{print $1}')"
-    local -r netmask="$(echo "${1:-}" | awk -F '/' '{print $2}')"
-    [ "$netmask" -ge 0 ] && [ "$netmask" -le 32 ] || return
-  elif validate_ipv4 "${1:-}" && [[ ${2:-} -ge 0 && ${2:-} -le 32 ]]; then
-    local -r ip="${1:-}"
-    local -r netmask="${2:-}"
-  else
-    #echo "Needs a valid IPv4 address and netmask" 1>&2
-    return
-  fi
-
-  octects=($(echo "$ip" | tr '.' '\n'))
-
-  local -r full_octects=$(( netmask / 8))
-  local -r reminder_bits=$(( netmask % 8 ))
-  local -r last_octect="${octects[$(( full_octects + 1))]}"
-  local -r net_octect="$(( reminder_bits > 0 ? (last_octect / ( 2 ** ( 8 - reminder_bits ))) * (2 ** ( 8 - reminder_bits )) : 0 ))"
-
-  local IFS='.'
-
-  while [ ${#final_ip[@]} -le $full_octects ]; do
-    final_ip+=("${octects[${#final_ip[@]}]}")
-  done
-
-  final_ip+=($net_octect)
-
-  while [[ ${#final_ip[@]} -lt 4 ]]; do
-    final_ip+=(0)
-  done
-
-  echo "${final_ip[*]:1}/${netmask}"
 }

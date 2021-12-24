@@ -31,6 +31,7 @@ get_all_allowed_ips() {
   for peer_ip in "${PEERS_IP[@]}"; do
     if ! validate_ip "$peer_ip"; then
       echo "Peer IP '$peer_ip' is invalid ip address"
+      return
     fi
 
     array_name="NETWORKS_CONFIG_${i}"
@@ -45,7 +46,7 @@ get_all_allowed_ips() {
   if ${ROUTE_ALL_PRIVATE:-false}; then
     echo "192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8"
   elif [[ ${#routes[@]} -gt 0 ]]; then
-    IFS=', '
+    IFS=$', '
     echo "${routes[*]}"
   else
     echo "0.0.0.0/0, ::/0"
@@ -161,11 +162,12 @@ gen_peer_config() {
     echo "PresharedKey = ${pre_shared_key}"
   fi
 
+  echo "AllowedIPs = ${allowed_ips[*]}" | awk '{gsub(/,\s*/,", ", $0); print}'
+
   if [[ "${is_nat:-true}" == "true" || "${is_nat:-}" == "1" ]]; then
     echo 'PersistentKeepalive = 25'
   fi
-
-  echo "AllowedIPs = ${allowed_ips}"
+  
   echo
 }
 

@@ -65,7 +65,6 @@ if [[ ! -r "$VPN_SERVER_PRIVATE_KEY" || ! -r "$VPN_SERVER_PUBLIC_KEY" ]]; then
   gen_pair_of_keys "$VPN_SERVER_PRIVATE_KEY" "$VPN_SERVER_PUBLIC_KEY" | _log "Generating server pair of keys"
 fi
 
-PEER_ROUTES="$(get_all_allowed_ips)"
 SERVER_PRIVATE_KEY="$(cat "$VPN_SERVER_PRIVATE_KEY")"
 SERVER_PUBLIC_KEY="$(cat "$VPN_SERVER_PUBLIC_KEY")"
 
@@ -124,14 +123,17 @@ for i in "${!PEERS_IP[@]}"; do
     echo
     echo "Generating peer config for '${peer_name}' in server config file"
 
-    REACHED_NETWORKS_PEER="$(get_peer_index_networks "$i")"
+    REACHED_NETWORKS_PEER="$(get_peer_index_networks "$i")" # "Server" config
     if [[ -n "${REACHED_NETWORKS_PEER:-}" ]]; then
-      REACHED_NETWORKS_PEER="${peer_ip}/32, ${VPN_NETWORK_CIDR}, ${REACHED_NETWORKS_PEER}"
+      PEER_ROUTES="${VPN_NETWORK_CIDR}, $(get_all_allowed_ips)" # "Client" config
     else
-      REACHED_NETWORKS_PEER="${peer_ip}/32"
+      PEER_ROUTES="$(get_all_allowed_ips)"
+      PEER_ROUTES="${peer_ip}/32, $(get_all_allowed_ips)"
       is_behind_nat=true
       echo "No other networks found for '${peer_name}'"
     fi
+    REACHED_NETWORKS_PEER="${peer_ip}/32${REACHED_NETWORKS_PEER:+, ${REACHED_NETWORKS_PEER}}"
+
     {
       # Should add in peer_ip a comma separated list of all reachable networks
       gen_peer_config "${peer_name}" "" "$peer_public_key" "${REACHED_NETWORKS_PEER}" false "${peer_psk:-}" | tee -a "$VPN_SERVER_CONFIG_FILE"
@@ -157,7 +159,7 @@ for i in "${!PEERS_IP[@]}"; do
     # Generate peer config for peer
     echo "Generating peer config for peer '${peer_name}'"
     {
-      gen_peer_config "Link '${peer_name}' to '${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}'" "${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}" "$SERVER_PUBLIC_KEY" "$PEER_ROUTES" "${is_behind_nat:-false}" "${peer_psk:-}" | tee -a "$peer_config_file"
+      gen_peer_config "Link '${peer_name}' to '${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}'" "${VPN_PUBLIC_IP}:${VPN_SERVER_PORT}" "$SERVER_PUBLIC_KEY" "${PEER_ROUTES}" "${is_behind_nat:-false}" "${peer_psk:-}" | tee -a "$peer_config_file"
     } | _log "Generated peer config for peer '${peer_name}'" &> /dev/null
     echo
   else
